@@ -1,0 +1,12 @@
+set(CMAKE_SYSTEM_NAME Windows)
+set(CMAKE_SYSTEM_PROCESSOR x86_64)
+
+set(target_arch x86_64-w64-mingw32)
+set(CMAKE_C_COMPILER ${target_arch}-gcc)
+set(CMAKE_CXX_COMPILER ${target_arch}-g++)
+set(CMAKE_RC_COMPILER ${target_arch}-windres)
+
+set(CMAKE_FIND_ROOT_PATH /usr/${target_arch})
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)

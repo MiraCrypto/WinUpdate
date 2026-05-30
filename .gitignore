@@ -1,0 +1,33 @@
+# Build artifacts
+build/
+bin/
+obj/
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+third_party/
+winupdate.json
+temp_archive
+winupdate_temp.json
