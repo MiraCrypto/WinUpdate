@@ -20,6 +20,7 @@ HWND hListView;
 HWND hComboVersion;
 HWND hBtnInstall;
 HWND hBtnPath;
+HWND hPathDisplay;
 HWND hStatus;
 
 std::unique_ptr<ManifestManager> g_manifest;
@@ -32,6 +33,7 @@ void InitializeProviders();
 void UpdatePackageList();
 void OnPackageSelect();
 void StartInstall();
+void OnChangePath();
 
 // Clean wWinMain signature
 extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
@@ -71,6 +73,9 @@ extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPW
     g_manifest = std::make_unique<ManifestManager>(rootPath);
     Logger::Log(L"Manifest manager initialized.");
 
+    std::wstring pathStr = L"Installation Path: " + rootPath.wstring();
+    SetWindowTextW(hPathDisplay, pathStr.c_str());
+
     UpdatePackageList();
 
     ShowWindow(hWndMain, nCmdShow);
@@ -84,8 +89,6 @@ extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPW
 
     return (int)msg.wParam;
 }
-
-void OnChangePath();
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
@@ -108,6 +111,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 
         hBtnPath = CreateWindowExW(0, WC_BUTTON, L"Change Path", WS_CHILD | WS_VISIBLE,
             380, 320, 120, 25, hWnd, (HMENU)1004, hInst, NULL);
+
+        hPathDisplay = CreateWindowExW(0, WC_STATIC, L"Path: ", WS_CHILD | WS_VISIBLE | SS_ENDELLIPSIS,
+            10, 360, 660, 20, hWnd, NULL, hInst, NULL);
 
         hStatus = CreateWindowExW(0, WC_STATIC, L"Ready", WS_CHILD | WS_VISIBLE,
             10, 420, 660, 20, hWnd, NULL, hInst, NULL);
@@ -253,6 +259,10 @@ void OnChangePath() {
         if (SHGetPathFromIDListW(pidl, path)) {
             std::filesystem::path newPath(path);
             g_manifest = std::make_unique<ManifestManager>(newPath);
+            
+            std::wstring pathStr = L"Installation Path: " + newPath.wstring();
+            SetWindowTextW(hPathDisplay, pathStr.c_str());
+
             UpdatePackageList();
             SetWindowTextW(hStatus, L"Path updated.");
         }

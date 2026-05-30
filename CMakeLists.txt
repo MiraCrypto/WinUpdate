@@ -18,6 +18,7 @@ link_libraries(
 set(SOURCES
     src/main.cpp
     src/WinUpdateCore.cpp
+    resources/resources.rc
 )
 
 # WIN32 property adds -mwindows for MinGW
