@@ -28,6 +28,7 @@ compile_commands.json
 
 # Project specific
 third_party/
+include/json.hpp
 winupdate.json
 temp_archive
 winupdate_temp.json

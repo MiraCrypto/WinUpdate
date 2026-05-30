@@ -17,16 +17,10 @@ jobs:
     - name: Install MinGW-w64 toolchain
       run: |
         sudo apt-get update
-        sudo apt-get install -y mingw-w64 cmake make
+        sudo apt-get install -y mingw-w64 cmake make curl
 
-    - name: Configure CMake
-      run: |
-        mkdir build
-        cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build WinUpdate
-      run: |
-        cmake --build build --config Release
+    - name: Run Build Script
+      run: ./build.sh
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
