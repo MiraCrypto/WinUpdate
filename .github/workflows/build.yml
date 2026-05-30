@@ -1,0 +1,36 @@
+name: Windows Cross-Compile CI
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install MinGW-w64 toolchain
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mingw-w64 cmake make
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build WinUpdate
+      run: |
+        cmake --build build --config Release
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: WinUpdate-Binary
+        path: build/WinUpdate.exe
+        if-no-files-found: error
