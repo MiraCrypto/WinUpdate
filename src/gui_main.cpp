@@ -9,6 +9,8 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <shlobj.h>
+#include <objbase.h>
 
 namespace CatUpdate {
 
@@ -126,6 +128,11 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
     );
     ListView_SetExtendedListViewStyle(m_packageListView, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
     SendMessage(m_packageListView, WM_SETFONT, reinterpret_cast<WPARAM>(defaultSystemFont), TRUE);
+
+    // Apply Cyberpunk theme colors to ListView
+    ListView_SetBkColor(m_packageListView, RGB(12, 12, 25));
+    ListView_SetTextBkColor(m_packageListView, RGB(12, 12, 25));
+    ListView_SetTextColor(m_packageListView, RGB(0, 240, 255));
 
     // Insert Columns
     LVCOLUMNW softwareNameColumn = {};
@@ -607,6 +614,11 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
     switch (message) {
     case WM_CREATE:
         return 0;
+    case WM_NCHITTEST: {
+        LRESULT hit = DefWindowProcW(hwnd, message, wparam, lparam);
+        if (hit == HTCLIENT) return HTCAPTION;
+        return hit;
+    }
     case WM_TIMER:
         if (wparam == 1001) {
             UpdateDemosceneAnimation(hwnd);
@@ -618,6 +630,12 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
         PaintDemosceneScreen(hwnd, hdc);
         EndPaint(hwnd, &ps);
         return 0;
+    }
+    case WM_CTLCOLORSTATIC: {
+        HDC hdcStatic = reinterpret_cast<HDC>(wparam);
+        SetTextColor(hdcStatic, RGB(0, 240, 255)); // Neon Cyan
+        SetBkMode(hdcStatic, TRANSPARENT);
+        return reinterpret_cast<LRESULT>(m_backgroundBrush);
     }
     case WM_ERASEBKGND:
         return 1; // Double buffer handles erasing entirely to avoid flicker

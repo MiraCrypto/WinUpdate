@@ -24,7 +24,7 @@ namespace CatUpdate {
 void SystemLogger::LogInformation(const std::string& message) {
     std::cout << "[INFO] " << message << std::endl;
 #if defined(_WIN32)
-    std::wstring wMessage(message.begin(), message.end());
+    std::wstring wMessage = Utils::ToWString(message);
     OutputDebugStringW((L"[CatUpdate INFO] " + wMessage + L"\n").c_str());
 #endif
 }
@@ -36,7 +36,7 @@ void SystemLogger::LogError(const std::string& message, const std::optional<std:
     }
     std::cerr << std::endl;
 #if defined(_WIN32)
-    std::wstring wMessage(message.begin(), message.end());
+    std::wstring wMessage = Utils::ToWString(message);
     OutputDebugStringW((L"[CatUpdate ERROR] " + wMessage + L"\n").c_str());
 #endif
 }
@@ -204,6 +204,34 @@ bool ManifestManager::IsPackageInstalled(const PackageIdentifier& packageIdentif
 
 std::vector<InstalledPackageState> ManifestManager::GetInstalledPackages() const {
     return m_installedPackages;
+}
+
+// -----------------------------------------------------------------------------
+// Utils Implementation
+// -----------------------------------------------------------------------------
+
+std::wstring Utils::ToWString(const std::string& utf8Str) {
+#if defined(_WIN32)
+    if (utf8Str.empty()) return L"";
+    int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), NULL, 0);
+    std::wstring wstrTo(sizeNeeded, 0);
+    MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), &wstrTo[0], sizeNeeded);
+    return wstrTo;
+#else
+    return std::wstring(utf8Str.begin(), utf8Str.end());
+#endif
+}
+
+std::string Utils::ToString(const std::wstring& utf16Str) {
+#if defined(_WIN32)
+    if (utf16Str.empty()) return "";
+    int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), NULL, 0, NULL, NULL);
+    std::string strTo(sizeNeeded, 0);
+    WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), &strTo[0], sizeNeeded, NULL, NULL);
+    return strTo;
+#else
+    return std::string(utf16Str.begin(), utf16Str.end());
+#endif
 }
 
 } // namespace CatUpdate

@@ -22,7 +22,7 @@ public:
         const DownloadProgressCallback& progressCallback
     ) override {
         // Parse components of the URL
-        std::wstring wUrl(sourceUrl.begin(), sourceUrl.end());
+        std::wstring wUrl = Utils::ToWString(sourceUrl);
         URL_COMPONENTS urlComponents = { sizeof(urlComponents) };
         urlComponents.dwHostNameLength = static_cast<DWORD>(-1);
         urlComponents.dwUrlPathLength = static_cast<DWORD>(-1);
@@ -161,7 +161,7 @@ public:
     }
 
     std::string FetchStringContent(const UrlString& sourceUrl) override {
-        std::wstring wUrl(sourceUrl.begin(), sourceUrl.end());
+        std::wstring wUrl = Utils::ToWString(sourceUrl);
         URL_COMPONENTS urlComponents = { sizeof(urlComponents) };
         urlComponents.dwHostNameLength = static_cast<DWORD>(-1);
         urlComponents.dwUrlPathLength = static_cast<DWORD>(-1);
@@ -216,7 +216,7 @@ public:
             requestHandle,
             headers.c_str(),
             static_cast<DWORD>(-1),
-            WINHTTP_HDR_ADDREQ_INDEXING | WINHTTP_HDR_ADDREQ_REPLACE
+            WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE
         );
 
         BOOL result = WinHttpSendRequest(requestHandle, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0);

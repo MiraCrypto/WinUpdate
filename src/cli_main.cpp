@@ -358,6 +358,16 @@ int CommandLineInterface::ExecutePathCommand(const std::vector<std::string>& pat
 
 } // namespace CatUpdate
 
+#if defined(_WIN32) && defined(UNICODE)
+int wmain(int argc, wchar_t* argv[]) {
+    std::vector<std::string> args;
+    args.reserve(argc);
+    for (int i = 0; i < argc; ++i) {
+        args.push_back(CatUpdate::Utils::ToString(argv[i]));
+    }
+    return CatUpdate::CommandLineInterface::Run(args);
+}
+#else
 int main(int argc, char* argv[]) {
     std::vector<std::string> args;
     args.reserve(argc);
@@ -366,3 +376,4 @@ int main(int argc, char* argv[]) {
     }
     return CatUpdate::CommandLineInterface::Run(args);
 }
+#endif

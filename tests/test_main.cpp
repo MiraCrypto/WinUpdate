@@ -8,7 +8,11 @@
 #define TEST_COLOR_CYAN    "\033[1;36m"
 #define TEST_COLOR_BOLD    "\033[1m"
 
+#if defined(_WIN32) && defined(UNICODE)
+int wmain() {
+#else
 int main() {
+#endif
     auto testCases = ::CatUpdate::TestRunner::Instance().GetTestCases();
     int passedCount = 0;
     int failedCount = 0;

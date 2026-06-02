@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include "CatUpdateCore.hpp"
+#include "Providers.hpp"
 
 namespace CatUpdate {
 

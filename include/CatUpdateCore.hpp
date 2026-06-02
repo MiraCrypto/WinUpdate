@@ -47,6 +47,22 @@ public:
 };
 
 /**
+ * Common string and system utilities.
+ */
+class Utils {
+public:
+    /**
+     * Converts a UTF-8 string to a UTF-16 wstring.
+     */
+    static std::wstring ToWString(const std::string& utf8Str);
+
+    /**
+     * Converts a UTF-16 wstring to a UTF-8 string.
+     */
+    static std::string ToString(const std::wstring& utf16Str);
+};
+
+/**
  * Handles platform-aware path resolutions for default installation targets.
  */
 class PathResolver {
