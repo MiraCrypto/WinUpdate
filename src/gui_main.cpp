@@ -10,15 +10,12 @@
 #include <iomanip>
 #include <chrono>
 
-// Subclass header for Win32 controls
-#include <vsstyle.h>
-#include <vssym32.h>
-
 namespace CatUpdate {
 
 // -----------------------------------------------------------------------------
 // Win32 Entry Point & Class Registration
 // -----------------------------------------------------------------------------
+// ... Rest of entry point code ...
 
 int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
     m_hinstance = hinstance;
@@ -495,8 +492,11 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
         auto httpClient = HttpClientFactory::CreateDefaultClient();
         auto versionsList = m_providers[selectedIndex]->FetchAvailableVersions(*httpClient);
         
+        // Safely allocate version list on the heap to pass across threads
+        auto* heapVersionsList = new std::vector<PackageVersion>(std::move(versionsList));
+        
         // Populate UI in main thread context
-        SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, 0), reinterpret_cast<LPARAM>(&versionsList));
+        SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, 0), reinterpret_cast<LPARAM>(heapVersionsList));
     }).detach();
 }
 
@@ -640,7 +640,8 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
 
         // Threading Messages
         if (commandId == 3001) { // Asynchronous versions query callback completed
-            std::vector<PackageVersion>* versions = reinterpret_cast<std::vector<PackageVersion>*>(lparam);
+            // Wrap in std::unique_ptr to ensure the heap-allocated vector is cleaned up automatically
+            std::unique_ptr<std::vector<PackageVersion>> versions(reinterpret_cast<std::vector<PackageVersion>*>(lparam));
             for (const auto& v : *versions) {
                 std::wstring wVersion = Utils::ToWString(v);
                 SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
