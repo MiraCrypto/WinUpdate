@@ -3,10 +3,12 @@
   <assemblyIdentity
     version="1.0.0.0"
     processorArchitecture="*"
-    name="WinUpdate"
+    name="CatUpdate"
     type="win32"
   />
-  <description>WinUpdate Software Manager</description>
+  <description>CatUpdate Software Center</description>
+  
+  <!-- Set target execution level to standard user (no admin or sudo required) -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
@@ -14,6 +16,8 @@
       </requestedPrivileges>
     </security>
   </trustInfo>
+
+  <!-- Enable visual styles via Common Controls v6 -->
   <dependency>
     <dependentAssembly>
       <assemblyIdentity
@@ -26,4 +30,12 @@
       />
     </dependentAssembly>
   </dependency>
+
+  <!-- High-DPI Awareness configuration (Windows 10+) -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft-com:application/2005/windowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft-com:application/2016/windowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
 </assembly>

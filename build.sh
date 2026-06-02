@@ -1,16 +1,15 @@
 #!/bin/bash
 set -e
 
-# Configuration
-BUILD_DIR="build"
+BUILD_DIR="build-windows"
 JSON_URL="https://github.com/nlohmann/json/releases/latest/download/json.hpp"
 TOOLCHAIN="toolchain-mingw64.cmake"
 
-echo "=== WinUpdate Build Script ==="
+echo "=== CatUpdate Windows Cross-Compile Script ==="
 
 # 1. Check for dependencies
 if ! command -v x86_64-w64-mingw32-g++ &> /dev/null; then
-    echo "Error: MinGW-w64 (x86_64-w64-mingw32-g++) not found."
+    echo "Error: MinGW-w64 cross-compiler (x86_64-w64-mingw32-g++) not found."
     exit 1
 fi
 
@@ -36,7 +35,10 @@ fi
 echo "Configuring with CMake..."
 cmake -S . -B "$BUILD_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=Release
 
-echo "Building..."
+echo "Building targets..."
 cmake --build "$BUILD_DIR" --config Release
 
-echo "=== Build Complete: $BUILD_DIR/WinUpdate.exe ==="
+echo "=== Build Complete ==="
+echo "CLI Binary:   $BUILD_DIR/catupdate.exe"
+echo "GUI Binary:   $BUILD_DIR/catupdate-gui.exe"
+echo "Tests Binary: $BUILD_DIR/catupdate-tests.exe"

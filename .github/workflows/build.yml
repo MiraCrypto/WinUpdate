@@ -1,4 +1,4 @@
-name: Windows Cross-Compile CI
+name: CatUpdate Cross-Platform CI
 
 on:
   push:
@@ -7,7 +7,44 @@ on:
     branches: [ "master", "main" ]
 
 jobs:
-  build:
+  # Job 1: Compile and Test Linux / POSIX native target
+  build-linux:
+    name: Build and Test Linux Native Target
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential curl unzip
+
+    - name: Download json.hpp
+      run: |
+        mkdir -p include
+        curl -L "https://github.com/nlohmann/json/releases/latest/download/json.hpp" -o include/json.hpp
+
+    - name: Configure with CMake
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build Linux Native CLI and Tests
+      run: cmake --build build
+
+    - name: Run Automated Unit Tests
+      run: ./build/catupdate-tests
+
+    - name: Upload Linux CLI Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: catupdate-linux-x64
+        path: build/catupdate
+        if-no-files-found: error
+
+  # Job 2: Cross-compile Windows executable files from Linux
+  build-windows:
+    name: Cross-Compile Windows Targets
     runs-on: ubuntu-latest
 
     steps:
@@ -19,12 +56,27 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y mingw-w64 cmake make curl
 
-    - name: Run Build Script
-      run: ./build.sh
+    - name: Download json.hpp
+      run: |
+        mkdir -p include
+        curl -L "https://github.com/nlohmann/json/releases/latest/download/json.hpp" -o include/json.hpp
 
-    - name: Upload Build Artifact
+    - name: Configure with CMake
+      run: cmake -S . -B build-windows -DCMAKE_TOOLCHAIN_FILE=toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build Windows CLI and Demoscene GUI
+      run: cmake --build build-windows
+
+    - name: Upload Windows CLI Executable
       uses: actions/upload-artifact@v4
       with:
-        name: WinUpdate-Binary
-        path: build/WinUpdate.exe
+        name: catupdate-windows-cli-x64
+        path: build-windows/catupdate.exe
+        if-no-files-found: error
+
+    - name: Upload Windows Demoscene GUI Executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: catupdate-windows-gui-x64
+        path: build-windows/catupdate-gui.exe
         if-no-files-found: error

@@ -1,4 +1,4 @@
 #include <windows.h>
 
-// 1 is the default ID for the application manifest
+// 1 is the default ID for the application manifest resource
 1 RT_MANIFEST "app.manifest"
