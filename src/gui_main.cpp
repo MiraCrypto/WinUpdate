@@ -54,7 +54,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         800,
-        580,
+        650,
         nullptr,
         nullptr,
         hinstance,
@@ -264,7 +264,7 @@ void DesktopUserInterface::InitializeDemosceneAssets(HWND parentWindow) {
     for (int i = 0; i < 100; ++i) {
         RetroStarParticle star;
         star.xPosition = static_cast<float>(rand() % 800);
-        star.yPosition = static_cast<float>(rand() % 550);
+        star.yPosition = static_cast<float>(rand() % 610);
         
         // layer depth (1 is fast/bright, 3 is slow/distant)
         star.intensityDepth = (rand() % 3) + 1;
@@ -371,7 +371,7 @@ void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
     SelectObject(memoryDeviceContext, m_scrollerFont);
     SetTextColor(memoryDeviceContext, RGB(57, 255, 20)); // Hacker Retro Green
 
-    int scrollerBaseY = height - 45;
+    int scrollerBaseY = height - 35;
     int startDrawX = static_cast<int>(m_tickerScrollOffset);
 
     for (size_t i = 0; i < m_tickerText.length(); ++i) {
@@ -422,22 +422,22 @@ void DesktopUserInterface::UpdateDemosceneAnimation(HWND hwnd) {
         star.xPosition -= star.horizontalVelocity;
         if (star.xPosition < -5) {
             star.xPosition = static_cast<float>(width + 5);
-            star.yPosition = static_cast<float>(rand() % 500);
+            star.yPosition = static_cast<float>(rand() % 610);
         }
     }
 
     // Force partial redraw of animation areas without erasing background, fully avoiding flicker
-    RECT scrollerRect = { 0, clientRectangle.bottom - 75, clientRectangle.right, clientRectangle.bottom };
+    RECT scrollerRect = { 0, clientRectangle.bottom - 65, clientRectangle.right, clientRectangle.bottom };
     InvalidateRect(hwnd, &scrollerRect, FALSE);
     
     RECT headerRect = { 0, 0, clientRectangle.right, 65 };
     InvalidateRect(hwnd, &headerRect, FALSE);
 
     // Repaint background regions around ListView
-    RECT backgroundLeftRect = { 0, 65, 18, clientRectangle.bottom - 75 };
+    RECT backgroundLeftRect = { 0, 65, 18, clientRectangle.bottom - 65 };
     InvalidateRect(hwnd, &backgroundLeftRect, FALSE);
 
-    RECT backgroundRightRect = { clientRectangle.right - 18, 65, clientRectangle.right, clientRectangle.bottom - 75 };
+    RECT backgroundRightRect = { clientRectangle.right - 18, 65, clientRectangle.right, clientRectangle.bottom - 65 };
     InvalidateRect(hwnd, &backgroundRightRect, FALSE);
 }
 
