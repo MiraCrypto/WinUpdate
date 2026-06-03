@@ -368,33 +368,7 @@ int CommandLineInterface::ExecuteUninstallCommand(const std::string& packageId) 
             std::filesystem::remove_all(packageState->installationPath);
         }
         
-        // Remove from json
-        std::vector<InstalledPackageState> remainingPackages;
-        for (const auto& packageState : manifest.GetInstalledPackages()) {
-            if (packageState.identifier != packageId) {
-                remainingPackages.push_back(packageState);
-            }
-        }
-
-        // We need to save the remaining. Let's clear manifest and update.
-        // To support this, we can re-create manifest or rewrite it.
-        // ManifestManager doesn't have a Direct Delete, let's register them or overwrite them.
-        // Let's create a temporary manifest and copy packages, then save.
-        // Actually, we can overwrite the file or add a method. Let's write the manifest.
-        std::filesystem::path manifestPath = manifest.GetManifestFilePath();
-        nlohmann::json jsonData;
-        jsonData["install_path"] = manifest.GetInstallationRootDirectory().string();
-        jsonData["packages"] = nlohmann::json::array();
-        for (const auto& packageState : remainingPackages) {
-            jsonData["packages"].push_back({
-                {"id", packageState.identifier},
-                {"version", packageState.installedVersion},
-                {"install_path", packageState.installationPath.string()},
-                {"install_date", packageState.installationDate}
-            });
-        }
-        std::ofstream file(manifestPath);
-        file << jsonData.dump(4);
+        manifest.UnregisterInstalledPackage(packageId);
 
         std::cout << COLOR_GREEN << "Uninstall completed successfully!" << COLOR_RESET << std::endl;
         return 0;

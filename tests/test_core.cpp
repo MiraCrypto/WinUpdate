@@ -65,6 +65,19 @@ TEST(ManifestManagerTest, SaveAndLoadCycle) {
         ASSERT_TRUE(query->installationDate == "2026-06-01");
     }
 
+    // Test unregistration and serialization
+    {
+        ManifestManager manager(sandboxDir);
+        manager.UnregisterInstalledPackage("nodejs");
+        ASSERT_FALSE(manager.IsPackageInstalled("nodejs"));
+    }
+
+    // Verify file persistence of unregistration
+    {
+        ManifestManager manager(sandboxDir);
+        ASSERT_FALSE(manager.IsPackageInstalled("nodejs"));
+    }
+
     // Clean up sandbox
     std::filesystem::remove_all(sandboxDir);
 }

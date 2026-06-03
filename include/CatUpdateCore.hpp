@@ -99,6 +99,11 @@ public:
     void RegisterOrUpdateInstalledPackage(const InstalledPackageState& packageState);
 
     /**
+     * Removes an installed package entry from the manifest database.
+     */
+    void UnregisterInstalledPackage(const PackageIdentifier& packageIdentifier);
+
+    /**
      * Queries the database for an installed package matching the identifier.
      */
     std::optional<InstalledPackageState> GetInstalledPackageByIdentifier(const PackageIdentifier& packageIdentifier) const;

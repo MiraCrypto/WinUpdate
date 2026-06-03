@@ -1,5 +1,6 @@
 #include "CatUpdateCore.hpp"
 #include "json.hpp"
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <format>
@@ -121,6 +122,18 @@ void ManifestManager::RegisterOrUpdateInstalledPackage(const InstalledPackageSta
     }
     m_installedPackages.push_back(packageState);
     SaveManifestToFile();
+}
+
+void ManifestManager::UnregisterInstalledPackage(const PackageIdentifier& packageIdentifier) {
+    auto iterator = std::remove_if(m_installedPackages.begin(), m_installedPackages.end(),
+        [&packageIdentifier](const InstalledPackageState& state) {
+            return state.identifier == packageIdentifier;
+        });
+
+    if (iterator != m_installedPackages.end()) {
+        m_installedPackages.erase(iterator, m_installedPackages.end());
+        SaveManifestToFile();
+    }
 }
 
 std::optional<InstalledPackageState> ManifestManager::GetInstalledPackageByIdentifier(

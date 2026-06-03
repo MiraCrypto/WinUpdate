@@ -80,6 +80,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
 
     // Display Current Installation Path
     std::wstring displayPath = L"Installation Path: " + defaultRootDirectory.wstring();
+    SetWindowTextW(m_pathDisplayEdit, displayPath.c_str());
     SetWindowTextW(m_changePathButton, L"Change Path");
 
     RefreshInstalledList();
@@ -90,6 +91,10 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
 
     // Start a timer for the demoscene scrolling ticker & starfield updates (every 25ms ~ 40FPS)
     SetTimer(m_mainWindow, 1001, 25, nullptr);
+
+    // Log startup sequence
+    AppendLog(L"CatUpdate GUI initialized.");
+    AppendLog(L"Default installation root: " + defaultRootDirectory.wstring());
 
     // Main message dispatch loop
     MSG windowMessage;
@@ -120,7 +125,7 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
         WC_LISTVIEW,
         L"",
         WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SINGLESEL,
-        20, 70, 745, 300,
+        20, 70, 745, 250,
         parentWindow,
         reinterpret_cast<HMENU>(2001),
         m_hinstance,
@@ -159,7 +164,7 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
         WC_COMBOBOX,
         L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
-        20, 390, 200, 200,
+        20, 335, 200, 200,
         parentWindow,
         reinterpret_cast<HMENU>(2002),
         m_hinstance,
@@ -173,7 +178,7 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
         WC_BUTTON,
         L"INSTALL / UPDATE",
         WS_CHILD | WS_VISIBLE | WS_DISABLED,
-        235, 390, 180, 30,
+        235, 335, 180, 30,
         parentWindow,
         reinterpret_cast<HMENU>(2003),
         m_hinstance,
@@ -186,7 +191,7 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
         WC_BUTTON,
         L"CHANGE PATH",
         WS_CHILD | WS_VISIBLE,
-        430, 390, 150, 30,
+        430, 335, 150, 30,
         parentWindow,
         reinterpret_cast<HMENU>(2004),
         m_hinstance,
@@ -194,13 +199,53 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
     );
     SetWindowSubclass(m_changePathButton, CustomButtonProc, 2, 0);
 
+    m_uninstallButton = CreateWindowExW(
+        0,
+        WC_BUTTON,
+        L"UNINSTALL",
+        WS_CHILD | WS_VISIBLE | WS_DISABLED,
+        595, 335, 170, 30,
+        parentWindow,
+        reinterpret_cast<HMENU>(2005),
+        m_hinstance,
+        nullptr
+    );
+    SetWindowSubclass(m_uninstallButton, CustomButtonProc, 3, 0);
+
+    // Installation Path Display label
+    m_pathDisplayEdit = CreateWindowExW(
+        0,
+        WC_EDIT,
+        L"Installation Path: ",
+        WS_CHILD | WS_VISIBLE | ES_LEFT | ES_READONLY | ES_AUTOHSCROLL | WS_BORDER,
+        20, 375, 745, 24,
+        parentWindow,
+        nullptr,
+        m_hinstance,
+        nullptr
+    );
+    SendMessage(m_pathDisplayEdit, WM_SETFONT, reinterpret_cast<WPARAM>(defaultSystemFont), TRUE);
+
+    // Hacker Terminal Console Log
+    m_consoleLogEdit = CreateWindowExW(
+        0,
+        WC_EDIT,
+        L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
+        20, 405, 745, 110,
+        parentWindow,
+        nullptr,
+        m_hinstance,
+        nullptr
+    );
+
     // Status Static label
     m_statusStatusBar = CreateWindowExW(
         0,
         WC_STATIC,
         L"Select a package to begin...",
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
-        20, 440, 745, 25,
+        20, 520, 745, 20,
         parentWindow,
         nullptr,
         m_hinstance,
@@ -259,6 +304,11 @@ void DesktopUserInterface::RecalculateLayoutAndDpi(HWND parentWindow) {
     ReleaseDC(parentWindow, deviceContext);
 
     m_dpiScaleFactor = static_cast<float>(pixelsPerInch) / 96.0f;
+
+    // Set Courier New monospaced font on terminal log edit
+    if (m_consoleLogEdit && m_scrollerFont) {
+        SendMessage(m_consoleLogEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_scrollerFont), TRUE);
+    }
 
     // Scale standard static controls and columns for crisp rendering
     ListView_SetColumnWidth(m_packageListView, 0, static_cast<int>(250 * m_dpiScaleFactor));
@@ -455,6 +505,11 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(
 
 void DesktopUserInterface::RefreshInstalledList() {
     ListView_DeleteAllItems(m_packageListView);
+    m_selectedPackageIndex = -1;
+    EnableWindow(m_installButton, FALSE);
+    EnableWindow(m_uninstallButton, FALSE);
+    SendMessage(m_versionComboBox, CB_RESETCONTENT, 0, 0);
+
     auto installed = m_manifest->GetInstalledPackages();
 
     for (size_t i = 0; i < m_providers.size(); ++i) {
@@ -490,8 +545,17 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
     }
     m_selectedPackageIndex = selectedIndex;
 
+    std::wstring packageDisplayName = Utils::ToWString(m_providers[selectedIndex]->GetDisplayName());
+    AppendLog(L"Selected package: " + packageDisplayName);
+    AppendLog(L"Querying remote versions registry...");
+
     SetWindowTextW(m_statusStatusBar, L"Status: Querying remote versions registry...");
     EnableWindow(m_installButton, FALSE);
+
+    // Enable/disable uninstall button immediately based on local installation state
+    bool isInstalled = m_manifest->IsPackageInstalled(m_providers[selectedIndex]->GetIdentifier());
+    EnableWindow(m_uninstallButton, isInstalled ? TRUE : FALSE);
+
     SendMessage(m_versionComboBox, CB_RESETCONTENT, 0, 0);
 
     // Fetch versions asynchronously to prevent GUI freezing
@@ -521,24 +585,47 @@ void DesktopUserInterface::TriggerInstallation() {
 
     SetWindowTextW(m_statusStatusBar, L"Status: Starting download sequence...");
     EnableWindow(m_installButton, FALSE);
+    EnableWindow(m_uninstallButton, FALSE);
 
     // Download & Extract inside background thread to maintain smooth scroller FPS
-    std::thread([packageIndex, version]() {
+    std::thread([packageIndex, version, wVer]() {
         auto provider = m_providers[packageIndex].get();
         auto url = provider->GetDownloadUrl(version);
         auto destinationDir = m_manifest->GetInstallationRootDirectory() / provider->GetIdentifier();
         auto tempArchive = m_manifest->GetInstallationRootDirectory() / ("temp_" + provider->GetArchiveFilename(version));
 
+        std::wstring displayName = Utils::ToWString(provider->GetDisplayName());
+        
+        // Thread-safe log reporting via window messages
+        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"--------------------------------------------------")));
+        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(std::format(L"Installation target: {} (Version: {})", displayName, wVer))));
+        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"Source URL: " + Utils::ToWString(url))));
+
         std::filesystem::create_directories(m_manifest->GetInstallationRootDirectory());
 
         auto httpClient = HttpClientFactory::CreateDefaultClient();
 
-        bool downloadSuccess = httpClient->DownloadFile(url, tempArchive, [](float progress) {
+        // Safe progress throttle tracker to avoid log buffer overflow
+        struct DownloadProgressTracker {
+            int lastLoggedPercent = -10;
+        };
+        auto tracker = std::make_shared<DownloadProgressTracker>();
+
+        bool downloadSuccess = httpClient->DownloadFile(url, tempArchive, [tracker](float progress) {
+            int percent = static_cast<int>(progress * 100.0f);
+            if (percent >= tracker->lastLoggedPercent + 10 || percent == 100) {
+                tracker->lastLoggedPercent = percent / 10 * 10;
+                std::wstring progressLog = std::format(L"Binaries download progress: {}%", percent);
+                PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(progressLog)));
+            }
             std::wstring text = std::format(L"Status: Downloading package binaries... {:.1f}%", progress * 100.0f);
             SetWindowTextW(m_statusStatusBar, text.c_str());
         });
 
         if (downloadSuccess) {
+            PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"Download completed successfully.")));
+            PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"Extracting files using native tar.exe...")));
+
             SetWindowTextW(m_statusStatusBar, L"Status: Extracting compressed archive files...");
             std::filesystem::create_directories(destinationDir);
 
@@ -568,11 +655,15 @@ void DesktopUserInterface::TriggerInstallation() {
 
                 m_manifest->RegisterOrUpdateInstalledPackage(state);
 
+                PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"Extraction complete.")));
+                PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(std::format(L"Success: {} successfully installed at {}", displayName, Utils::ToWString(destinationDir.string())))));
                 SetWindowTextW(m_statusStatusBar, L"Status: Installation completed and registered successfully!");
             } else {
+                PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Archive extraction failed (tar.exe exit code non-zero).")));
                 SetWindowTextW(m_statusStatusBar, L"Status: Extraction failed. Archive file might be corrupted.");
             }
         } else {
+            PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Download request failed.")));
             SetWindowTextW(m_statusStatusBar, L"Status: Network error. Binaries download failed.");
         }
 
@@ -598,12 +689,69 @@ void DesktopUserInterface::TriggerPathChange() {
             m_manifest = std::make_unique<ManifestManager>(path);
             
             std::wstring displayPath = L"Installation Path: " + path.wstring();
+            SetWindowTextW(m_pathDisplayEdit, displayPath.c_str());
             
+            AppendLog(L"Installation root path changed to: " + path.wstring());
+
             RefreshInstalledList();
             SetWindowTextW(m_statusStatusBar, L"Status: Target installation directory changed.");
         }
         CoTaskMemFree(pidl);
     }
+}
+
+void DesktopUserInterface::TriggerUninstallation() {
+    int packageIndex = m_selectedPackageIndex;
+    if (packageIndex == -1) {
+        return;
+    }
+
+    auto provider = m_providers[packageIndex].get();
+    auto packageId = provider->GetIdentifier();
+    std::wstring displayName = Utils::ToWString(provider->GetDisplayName());
+
+    // Disable buttons during action
+    EnableWindow(m_installButton, FALSE);
+    EnableWindow(m_uninstallButton, FALSE);
+    SetWindowTextW(m_statusStatusBar, L"Status: Starting uninstall sequence...");
+
+    // Run uninstallation on background thread
+    std::thread([packageIndex, packageId, displayName]() {
+        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"--------------------------------------------------")));
+        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(std::format(L"Uninstallation target: {}", displayName))));
+
+        auto packageState = m_manifest->GetInstalledPackageByIdentifier(packageId);
+        if (!packageState.has_value()) {
+            PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Package is not registered as installed.")));
+            SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation failed.");
+            
+            // Re-enable controls via message 3002
+            SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3002, 0), 0);
+            return;
+        }
+
+        std::wstring installPathStr = Utils::ToWString(packageState->installationPath.string());
+        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"Removing installation files at: " + installPathStr)));
+
+        try {
+            if (std::filesystem::exists(packageState->installationPath)) {
+                std::filesystem::remove_all(packageState->installationPath);
+            }
+            
+            m_manifest->UnregisterInstalledPackage(packageId);
+
+            PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"Files removed successfully.")));
+            PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(std::format(L"Success: {} uninstalled successfully.", displayName))));
+            SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation completed successfully!");
+        } catch (const std::exception& ex) {
+            std::wstring errorMsg = Utils::ToWString(ex.what());
+            PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Failed to uninstall package: " + errorMsg)));
+            SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation failed.");
+        }
+
+        // Trigger refresh and reset buttons on the main thread
+        SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3002, 0), 0);
+    }).detach();
 }
 
 // -----------------------------------------------------------------------------
@@ -631,9 +779,18 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
         EndPaint(hwnd, &ps);
         return 0;
     }
+    case WM_CTLCOLOREDIT:
     case WM_CTLCOLORSTATIC: {
         HDC hdcStatic = reinterpret_cast<HDC>(wparam);
-        SetTextColor(hdcStatic, RGB(0, 240, 255)); // Neon Cyan
+        HWND hwndControl = reinterpret_cast<HWND>(lparam);
+        
+        // Hacker console log is green, status/paths are neon cyan
+        if (hwndControl == m_consoleLogEdit) {
+            SetTextColor(hdcStatic, RGB(57, 255, 20));
+        } else {
+            SetTextColor(hdcStatic, RGB(0, 240, 255));
+        }
+        
         SetBkMode(hdcStatic, TRANSPARENT);
         return reinterpret_cast<LRESULT>(m_backgroundBrush);
     }
@@ -654,6 +811,8 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
             TriggerInstallation();
         } else if (commandId == 2004) {
             TriggerPathChange();
+        } else if (commandId == 2005) {
+            TriggerUninstallation();
         }
 
         // Threading Messages
@@ -667,10 +826,16 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
             SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
             EnableWindow(m_installButton, TRUE);
             SetWindowTextW(m_statusStatusBar, L"Status: Versions registry updated.");
+            AppendLog(L"Loaded available versions list successfully.");
         } else if (commandId == 3002) { // Refresh package listings
             RefreshInstalledList();
         }
         break;
+    }
+    case WM_APP + 1: { // Asynchronous Thread Safe Logging message
+        std::unique_ptr<std::wstring> logMessage(reinterpret_cast<std::wstring*>(lparam));
+        AppendLog(*logMessage);
+        return 0;
     }
     case WM_DESTROY:
         KillTimer(hwnd, 1001);
@@ -681,6 +846,27 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
 }
 
 } // namespace CatUpdate
+
+void DesktopUserInterface::AppendLog(const std::wstring& message) {
+    if (!m_consoleLogEdit) {
+        return;
+    }
+
+    // Get current local system time
+    auto now = std::chrono::system_clock::now();
+    std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+    std::tm timeStruct = *std::localtime(&nowTime);
+    
+    std::wstring timeString = std::format(L"[{:02}:{:02}:{:02}] ", 
+        timeStruct.tm_hour, timeStruct.tm_min, timeStruct.tm_sec);
+
+    std::wstring fullLine = timeString + message + L"\r\n";
+
+    // Set selection focus to the end of edit control and append text
+    int length = GetWindowTextLengthW(m_consoleLogEdit);
+    SendMessage(m_consoleLogEdit, EM_SETSEL, length, length);
+    SendMessage(m_consoleLogEdit, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(fullLine.c_str()));
+}
 
 // Win32 Entry point
 extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {

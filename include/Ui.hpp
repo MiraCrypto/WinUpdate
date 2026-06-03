@@ -43,8 +43,10 @@ private:
     // UI thread safety callbacks & event handlers
     static void OnPackageSelectionChanged();
     static void TriggerInstallation();
+    static void TriggerUninstallation();
     static void TriggerPathChange();
     static void RefreshInstalledList();
+    static void AppendLog(const std::wstring& message);
 
     // Painting & Demoscene animations
     static void PaintDemosceneScreen(HWND hwnd, HDC hdc);
@@ -57,8 +59,11 @@ private:
     inline static HWND m_packageListView = nullptr;
     inline static HWND m_versionComboBox = nullptr;
     inline static HWND m_installButton = nullptr;
+    inline static HWND m_uninstallButton = nullptr;
     inline static HWND m_changePathButton = nullptr;
     inline static HWND m_statusStatusBar = nullptr;
+    inline static HWND m_pathDisplayEdit = nullptr;
+    inline static HWND m_consoleLogEdit = nullptr;
 
     inline static std::unique_ptr<ManifestManager> m_manifest;
     inline static std::vector<std::unique_ptr<PackageProvider>> m_providers;
