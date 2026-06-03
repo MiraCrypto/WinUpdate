@@ -9,15 +9,15 @@ TEST(ProvidersTest, RegistryInitialization) {
     ASSERT_FALSE(providers.empty());
 
     // Check that NodeJs and VSCodium are present (they are supported on all platforms)
-    bool hasNode = false;
-    bool hasVsc = false;
+    bool hasNodeJs = false;
+    bool hasVscodium = false;
     for (const auto& p : providers) {
-        if (p->GetIdentifier() == "nodejs") hasNode = true;
-        if (p->GetIdentifier() == "vscodium") hasVsc = true;
+        if (p->GetIdentifier() == "nodejs") hasNodeJs = true;
+        if (p->GetIdentifier() == "vscodium") hasVscodium = true;
     }
 
-    ASSERT_TRUE(hasNode);
-    ASSERT_TRUE(hasVsc);
+    ASSERT_TRUE(hasNodeJs);
+    ASSERT_TRUE(hasVscodium);
 }
 
 TEST(ProvidersTest, PlatformSupportFiltering) {

@@ -469,9 +469,9 @@ void DesktopUserInterface::RefreshInstalledList() {
 
         // Installed version query
         std::wstring installedVersionStr = L"Not Installed";
-        for (const auto& pkg : installed) {
-            if (pkg.identifier == m_providers[i]->GetIdentifier()) {
-                installedVersionStr = Utils::ToWString(pkg.installedVersion);
+        for (const auto& installedPackageState : installed) {
+            if (installedPackageState.identifier == m_providers[i]->GetIdentifier()) {
+                installedVersionStr = Utils::ToWString(installedPackageState.installedVersion);
                 break;
             }
         }

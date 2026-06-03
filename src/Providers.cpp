@@ -230,15 +230,15 @@ std::vector<PackageVersion> GitPackageProvider::FetchAvailableVersions(HttpClien
 }
 
 UrlString GitPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-    std::string ver = version;
-    if (ver.starts_with("v")) {
-        ver = ver.substr(1);
+    std::string sanitizedVersion = version;
+    if (sanitizedVersion.starts_with("v")) {
+        sanitizedVersion = sanitizedVersion.substr(1);
     }
-    size_t winSuffixIndex = ver.find(".windows");
+    size_t winSuffixIndex = sanitizedVersion.find(".windows");
     if (winSuffixIndex != std::string::npos) {
-        ver = ver.substr(0, winSuffixIndex);
+        sanitizedVersion = sanitizedVersion.substr(0, winSuffixIndex);
     }
-    return std::format("https://github.com/git-for-windows/git/releases/download/{0}/PortableGit-{1}-64-bit.7z.exe", version, ver);
+    return std::format("https://github.com/git-for-windows/git/releases/download/{0}/PortableGit-{1}-64-bit.7z.exe", version, sanitizedVersion);
 }
 
 std::string GitPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
@@ -279,11 +279,11 @@ std::vector<PackageVersion> VimPackageProvider::FetchAvailableVersions(HttpClien
 }
 
 UrlString VimPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-    std::string ver = version;
-    if (ver.starts_with("v")) {
-        ver = ver.substr(1);
+    std::string sanitizedVersion = version;
+    if (sanitizedVersion.starts_with("v")) {
+        sanitizedVersion = sanitizedVersion.substr(1);
     }
-    return std::format("https://github.com/vim/vim-win32-installer/releases/download/{0}/gvim_{1}_x64.zip", version, ver);
+    return std::format("https://github.com/vim/vim-win32-installer/releases/download/{0}/gvim_{1}_x64.zip", version, sanitizedVersion);
 }
 
 std::string VimPackageProvider::GetArchiveFilename(const PackageVersion& version) const {

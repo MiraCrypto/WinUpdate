@@ -370,9 +370,9 @@ int CommandLineInterface::ExecuteUninstallCommand(const std::string& packageId) 
         
         // Remove from json
         std::vector<InstalledPackageState> remainingPackages;
-        for (const auto& pkg : manifest.GetInstalledPackages()) {
-            if (pkg.identifier != packageId) {
-                remainingPackages.push_back(pkg);
+        for (const auto& packageState : manifest.GetInstalledPackages()) {
+            if (packageState.identifier != packageId) {
+                remainingPackages.push_back(packageState);
             }
         }
 
@@ -385,12 +385,12 @@ int CommandLineInterface::ExecuteUninstallCommand(const std::string& packageId) 
         nlohmann::json jsonData;
         jsonData["install_path"] = manifest.GetInstallationRootDirectory().string();
         jsonData["packages"] = nlohmann::json::array();
-        for (const auto& pkg : remainingPackages) {
+        for (const auto& packageState : remainingPackages) {
             jsonData["packages"].push_back({
-                {"id", pkg.identifier},
-                {"version", pkg.installedVersion},
-                {"install_path", pkg.installationPath.string()},
-                {"install_date", pkg.installationDate}
+                {"id", packageState.identifier},
+                {"version", packageState.installedVersion},
+                {"install_path", packageState.installationPath.string()},
+                {"install_date", packageState.installationDate}
             });
         }
         std::ofstream file(manifestPath);

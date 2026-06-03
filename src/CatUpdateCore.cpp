@@ -91,12 +91,12 @@ bool ManifestManager::SaveManifestToFile() {
     jsonData["install_path"] = m_installationRootDirectory.string();
     jsonData["packages"] = nlohmann::json::array();
 
-    for (const auto& pkg : m_installedPackages) {
+    for (const auto& package : m_installedPackages) {
         nlohmann::json pkgJson = {
-            {"id", pkg.identifier},
-            {"version", pkg.installedVersion},
-            {"install_path", pkg.installationPath.string()},
-            {"install_date", pkg.installationDate}
+            {"id", package.identifier},
+            {"version", package.installedVersion},
+            {"install_path", package.installationPath.string()},
+            {"install_date", package.installationDate}
         };
         jsonData["packages"].push_back(pkgJson);
     }

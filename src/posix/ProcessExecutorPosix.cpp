@@ -47,7 +47,7 @@ std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteCommand(
         cArgs.push_back(nullptr);
 
         execvp(cArgs[0], cArgs.data());
-        
+
         // If exec fails, terminate immediately
         exit(127);
     }
