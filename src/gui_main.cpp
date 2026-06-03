@@ -845,8 +845,6 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
     return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
-} // namespace CatUpdate
-
 void DesktopUserInterface::AppendLog(const std::wstring& message) {
     if (!m_consoleLogEdit) {
         return;
@@ -867,6 +865,8 @@ void DesktopUserInterface::AppendLog(const std::wstring& message) {
     SendMessage(m_consoleLogEdit, EM_SETSEL, length, length);
     SendMessage(m_consoleLogEdit, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(fullLine.c_str()));
 }
+
+} // namespace CatUpdate
 
 // Win32 Entry point
 extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
