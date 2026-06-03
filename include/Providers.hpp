@@ -1,10 +1,10 @@
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <string>
 #include "CatUpdateCore.hpp"
 #include "HttpClient.hpp"
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace CatUpdate {
 
@@ -13,37 +13,37 @@ namespace CatUpdate {
  */
 class PackageProvider {
 public:
-    virtual ~PackageProvider() = default;
+  virtual ~PackageProvider() = default;
 
-    /**
-     * Unique string identifier of the software package (e.g. "nodejs").
-     */
-    virtual PackageIdentifier GetIdentifier() const = 0;
+  /**
+   * Unique string identifier of the software package (e.g. "nodejs").
+   */
+  virtual PackageIdentifier GetIdentifier() const = 0;
 
-    /**
-     * Friendly display name of the software package (e.g. "Node.js (LTS)").
-     */
-    virtual PackageName GetDisplayName() const = 0;
+  /**
+   * Friendly display name of the software package (e.g. "Node.js (LTS)").
+   */
+  virtual PackageName GetDisplayName() const = 0;
 
-    /**
-     * Returns whether this package can be installed on the current running operating system.
-     */
-    virtual bool IsPlatformSupported() const = 0;
+  /**
+   * Returns whether this package can be installed on the current running operating system.
+   */
+  virtual bool IsPlatformSupported() const = 0;
 
-    /**
-     * Fetches the list of available version tags from remote APIs.
-     */
-    virtual std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) = 0;
+  /**
+   * Fetches the list of available version tags from remote APIs.
+   */
+  virtual std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) = 0;
 
-    /**
-     * Computes the direct download URL for a given version.
-     */
-    virtual UrlString GetDownloadUrl(const PackageVersion& version) const = 0;
+  /**
+   * Computes the direct download URL for a given version.
+   */
+  virtual UrlString GetDownloadUrl(const PackageVersion& version) const = 0;
 
-    /**
-     * Computes the local archive filename for a given version.
-     */
-    virtual std::string GetArchiveFilename(const PackageVersion& version) const = 0;
+  /**
+   * Computes the local archive filename for a given version.
+   */
+  virtual std::string GetArchiveFilename(const PackageVersion& version) const = 0;
 };
 
 /**
@@ -51,7 +51,7 @@ public:
  */
 class BasePackageProvider : public PackageProvider {
 protected:
-    std::string FetchRemoteJson(HttpClient& httpClient, const UrlString& apiUrl);
+  static std::string FetchRemoteJson(HttpClient& httpClient, const UrlString& apiUrl);
 };
 
 /**
@@ -59,12 +59,12 @@ protected:
  */
 class NodeJsPackageProvider : public BasePackageProvider {
 public:
-    PackageIdentifier GetIdentifier() const override;
-    PackageName GetDisplayName() const override;
-    bool IsPlatformSupported() const override;
-    std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-    UrlString GetDownloadUrl(const PackageVersion& version) const override;
-    std::string GetArchiveFilename(const PackageVersion& version) const override;
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  bool IsPlatformSupported() const override;
+  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  UrlString GetDownloadUrl(const PackageVersion& version) const override;
+  std::string GetArchiveFilename(const PackageVersion& version) const override;
 };
 
 /**
@@ -72,12 +72,12 @@ public:
  */
 class VSCodiumPackageProvider : public BasePackageProvider {
 public:
-    PackageIdentifier GetIdentifier() const override;
-    PackageName GetDisplayName() const override;
-    bool IsPlatformSupported() const override;
-    std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-    UrlString GetDownloadUrl(const PackageVersion& version) const override;
-    std::string GetArchiveFilename(const PackageVersion& version) const override;
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  bool IsPlatformSupported() const override;
+  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  UrlString GetDownloadUrl(const PackageVersion& version) const override;
+  std::string GetArchiveFilename(const PackageVersion& version) const override;
 };
 
 /**
@@ -85,12 +85,12 @@ public:
  */
 class PythonPackageProvider : public BasePackageProvider {
 public:
-    PackageIdentifier GetIdentifier() const override;
-    PackageName GetDisplayName() const override;
-    bool IsPlatformSupported() const override;
-    std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-    UrlString GetDownloadUrl(const PackageVersion& version) const override;
-    std::string GetArchiveFilename(const PackageVersion& version) const override;
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  bool IsPlatformSupported() const override;
+  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  UrlString GetDownloadUrl(const PackageVersion& version) const override;
+  std::string GetArchiveFilename(const PackageVersion& version) const override;
 };
 
 /**
@@ -98,12 +98,12 @@ public:
  */
 class OpenJdkPackageProvider : public BasePackageProvider {
 public:
-    PackageIdentifier GetIdentifier() const override;
-    PackageName GetDisplayName() const override;
-    bool IsPlatformSupported() const override;
-    std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-    UrlString GetDownloadUrl(const PackageVersion& version) const override;
-    std::string GetArchiveFilename(const PackageVersion& version) const override;
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  bool IsPlatformSupported() const override;
+  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  UrlString GetDownloadUrl(const PackageVersion& version) const override;
+  std::string GetArchiveFilename(const PackageVersion& version) const override;
 };
 
 /**
@@ -111,12 +111,12 @@ public:
  */
 class GitPackageProvider : public BasePackageProvider {
 public:
-    PackageIdentifier GetIdentifier() const override;
-    PackageName GetDisplayName() const override;
-    bool IsPlatformSupported() const override;
-    std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-    UrlString GetDownloadUrl(const PackageVersion& version) const override;
-    std::string GetArchiveFilename(const PackageVersion& version) const override;
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  bool IsPlatformSupported() const override;
+  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  UrlString GetDownloadUrl(const PackageVersion& version) const override;
+  std::string GetArchiveFilename(const PackageVersion& version) const override;
 };
 
 /**
@@ -124,12 +124,12 @@ public:
  */
 class VimPackageProvider : public BasePackageProvider {
 public:
-    PackageIdentifier GetIdentifier() const override;
-    PackageName GetDisplayName() const override;
-    bool IsPlatformSupported() const override;
-    std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-    UrlString GetDownloadUrl(const PackageVersion& version) const override;
-    std::string GetArchiveFilename(const PackageVersion& version) const override;
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  bool IsPlatformSupported() const override;
+  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  UrlString GetDownloadUrl(const PackageVersion& version) const override;
+  std::string GetArchiveFilename(const PackageVersion& version) const override;
 };
 
 /**
@@ -137,7 +137,7 @@ public:
  */
 class PackageProviderRegistry {
 public:
-    static std::vector<std::unique_ptr<PackageProvider>> GetRegisteredProviders();
+  static std::vector<std::unique_ptr<PackageProvider>> GetRegisteredProviders();
 };
 
 } // namespace CatUpdate

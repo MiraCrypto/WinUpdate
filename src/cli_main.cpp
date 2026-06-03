@@ -1,428 +1,478 @@
-#include "Cli.hpp"
 #include "CatUpdateCore.hpp"
+#include "Cli.hpp"
 #include "HttpClient.hpp"
-#include "Providers.hpp"
 #include "ProcessExecutor.hpp"
+#include "Providers.hpp"
 #include "json.hpp"
-#include <iostream>
-#include <fstream>
-#include <format>
 #include <algorithm>
 #include <chrono>
+#include <format>
+#include <fstream>
+#include <iostream>
 
 // ANSI Terminal Colors
-#define COLOR_RESET   "\033[0m"
-#define COLOR_GREEN   "\033[1;32m"
-#define COLOR_YELLOW  "\033[1;33m"
-#define COLOR_RED     "\033[1;31m"
-#define COLOR_CYAN    "\033[1;36m"
-#define COLOR_BOLD    "\033[1m"
+constexpr const char* const COLOR_RESET = "\033[0m";
+constexpr const char* const COLOR_GREEN = "\033[1;32m";
+constexpr const char* const COLOR_YELLOW = "\033[1;33m";
+constexpr const char* const COLOR_RED = "\033[1;31m";
+constexpr const char* const COLOR_CYAN = "\033[1;36m";
+constexpr const char* const COLOR_BOLD = "\033[1m";
 
 namespace CatUpdate {
 
-int CommandLineInterface::Run(const std::vector<std::string>& arguments) {
-    if (arguments.size() < 2) {
-        PrintUsage();
-        return 0;
+static std::string ParseVersionOverride(const std::vector<std::string>& arguments) {
+  for (size_t i = 3; i < arguments.size(); ++i) {
+    if (arguments[i] == "--version" && i + 1 < arguments.size()) {
+      return arguments[i + 1];
     }
+  }
+  return "";
+}
 
-    std::string command = arguments[1];
-    
-    if (command == "list") {
-        return ExecuteListCommand();
-    } else if (command == "info") {
-        if (arguments.size() < 3) {
-            std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << std::endl;
-            return 1;
-        }
-        return ExecuteInfoCommand(arguments[2]);
-    } else if (command == "install") {
-        if (arguments.size() < 3) {
-            std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << std::endl;
-            return 1;
-        }
-        std::string packageId = arguments[2];
-        std::string versionOverride;
-        for (size_t i = 3; i < arguments.size(); ++i) {
-            if (arguments[i] == "--version" && i + 1 < arguments.size()) {
-                versionOverride = arguments[i + 1];
-                break;
-            }
-        }
-        return ExecuteInstallCommand(packageId, versionOverride);
-    } else if (command == "download") {
-        if (arguments.size() < 3) {
-            std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << std::endl;
-            return 1;
-        }
-        std::string packageId = arguments[2];
-        std::string versionOverride;
-        for (size_t i = 3; i < arguments.size(); ++i) {
-            if (arguments[i] == "--version" && i + 1 < arguments.size()) {
-                versionOverride = arguments[i + 1];
-                break;
-            }
-        }
-        return ExecuteDownloadCommand(packageId, versionOverride);
-    } else if (command == "uninstall") {
-        if (arguments.size() < 3) {
-            std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << std::endl;
-            return 1;
-        }
-        return ExecuteUninstallCommand(arguments[2]);
-    } else if (command == "path") {
-        std::vector<std::string> pathArgs(arguments.begin() + 2, arguments.end());
-        return ExecutePathCommand(pathArgs);
-    } else {
-        std::cerr << COLOR_RED << "Error: Unknown command '" << command << "'" << COLOR_RESET << std::endl;
-        PrintUsage();
-        return 1;
+int CommandLineInterface::Run(const std::vector<std::string>& arguments) {
+  if (arguments.size() < 2) {
+    PrintUsage();
+    return 0;
+  }
+
+  const std::string& command = arguments[1];
+
+  if (command == "list") {
+    return ExecuteListCommand();
+  }
+  if (command == "info") {
+    if (arguments.size() < 3) {
+      std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << '\n';
+      return 1;
     }
+    return ExecuteInfoCommand(arguments[2]);
+  }
+  if (command == "install") {
+    if (arguments.size() < 3) {
+      std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << '\n';
+      return 1;
+    }
+    const std::string& packageId = arguments[2];
+    const std::string versionOverride = ParseVersionOverride(arguments);
+    return ExecuteInstallCommand(packageId, versionOverride);
+  }
+
+  if (command == "download") {
+    if (arguments.size() < 3) {
+      std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << '\n';
+      return 1;
+    }
+    const std::string& packageId = arguments[2];
+    const std::string versionOverride = ParseVersionOverride(arguments);
+    return ExecuteDownloadCommand(packageId, versionOverride);
+  }
+
+  if (command == "uninstall") {
+    if (arguments.size() < 3) {
+      std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << '\n';
+      return 1;
+    }
+    return ExecuteUninstallCommand(arguments[2]);
+  }
+
+  if (command == "path") {
+    const std::vector<std::string> pathArgs(arguments.begin() + 2, arguments.end());
+    return ExecutePathCommand(pathArgs);
+  }
+
+  std::cerr << COLOR_RED << "Error: Unknown command '" << command << "'" << COLOR_RESET << '\n';
+  PrintUsage();
+  return 1;
 }
 
 void CommandLineInterface::PrintUsage() {
-    std::cout << COLOR_CYAN << "=== CatUpdate Software Center CLI ===" << COLOR_RESET << std::endl;
-    std::cout << COLOR_BOLD << "Usage:" << COLOR_RESET << std::endl;
-    std::cout << "  catupdate <command> [arguments]" << std::endl << std::endl;
-    std::cout << COLOR_BOLD << "Commands:" << COLOR_RESET << std::endl;
-    std::cout << "  " << COLOR_GREEN << "list" << COLOR_RESET << "                      List all available packages, versions, and status" << std::endl;
-    std::cout << "  " << COLOR_GREEN << "info <package_id>" << COLOR_RESET << "         Show detailed package info and versions" << std::endl;
-    std::cout << "  " << COLOR_GREEN << "install <package_id> [args]" << COLOR_RESET << " Install or update a package" << std::endl;
-    std::cout << "      options: --version <ver>  Install specific version" << std::endl;
-    std::cout << "  " << COLOR_GREEN << "download <package_id> [args]" << COLOR_RESET << " Download package archive to current directory" << std::endl;
-    std::cout << "      options: --version <ver>  Download specific version" << std::endl;
-    std::cout << "  " << COLOR_GREEN << "uninstall <package_id>" << COLOR_RESET << "   Remove an installed package" << std::endl;
-    std::cout << "  " << COLOR_GREEN << "path [<new_path>]" << COLOR_RESET << "         Display or modify the root installation directory" << std::endl;
-    std::cout << std::endl;
+  std::cout << COLOR_CYAN << "=== CatUpdate Software Center CLI ===" << COLOR_RESET << '\n';
+  std::cout << COLOR_BOLD << "Usage:" << COLOR_RESET << '\n';
+  std::cout << "  catupdate <command> [arguments]" << '\n' << '\n';
+  std::cout << COLOR_BOLD << "Commands:" << COLOR_RESET << '\n';
+  std::cout << "  " << COLOR_GREEN << "list" << COLOR_RESET
+            << "                      List all available packages, versions, and status" << '\n';
+  std::cout << "  " << COLOR_GREEN << "info <package_id>" << COLOR_RESET
+            << "         Show detailed package info and versions" << '\n';
+  std::cout << "  " << COLOR_GREEN << "install <package_id> [args]" << COLOR_RESET
+            << " Install or update a package" << '\n';
+  std::cout << "      options: --version <ver>  Install specific version" << '\n';
+  std::cout << "  " << COLOR_GREEN << "download <package_id> [args]" << COLOR_RESET
+            << " Download package archive to current directory" << '\n';
+  std::cout << "      options: --version <ver>  Download specific version" << '\n';
+  std::cout << "  " << COLOR_GREEN << "uninstall <package_id>" << COLOR_RESET
+            << "   Remove an installed package" << '\n';
+  std::cout << "  " << COLOR_GREEN << "path [<new_path>]" << COLOR_RESET
+            << "         Display or modify the root installation directory" << '\n';
+  std::cout << '\n';
 }
 
 int CommandLineInterface::ExecuteListCommand() {
-    auto rootPath = PathResolver::GetDefaultInstallationRootPath();
-    ManifestManager manifest(rootPath);
-    auto providers = PackageProviderRegistry::GetRegisteredProviders();
+  auto rootPath = PathResolver::GetDefaultInstallationRootPath();
+  ManifestManager manifest(rootPath);
+  auto providers = PackageProviderRegistry::GetRegisteredProviders();
 
-    std::cout << COLOR_BOLD << "Root Installation Directory: " << COLOR_RESET << manifest.GetInstallationRootDirectory().string() << std::endl << std::endl;
-    std::cout << std::format("{:<25} {:<15} {:<20} {:<15}", "Software Name", "Identifier", "Installed Version", "Status") << std::endl;
-    std::cout << std::string(78, '-') << std::endl;
+  std::cout << COLOR_BOLD << "Root Installation Directory: " << COLOR_RESET
+            << manifest.GetInstallationRootDirectory().string() << '\n'
+            << '\n';
+  std::cout << std::format("{:<25} {:<15} {:<20} {:<15}", "Software Name", "Identifier",
+                           "Installed Version", "Status")
+            << '\n';
+  constexpr int SEPARATOR_LINE_LENGTH = 78;
+  std::cout << std::string(SEPARATOR_LINE_LENGTH, '-') << '\n';
 
-    for (const auto& provider : providers) {
-        std::string status = "Available";
-        std::string versionStr = "Not Installed";
-        
-        auto installed = manifest.GetInstalledPackageByIdentifier(provider->GetIdentifier());
-        if (installed.has_value()) {
-            status = COLOR_GREEN "Installed" COLOR_RESET;
-            versionStr = installed->installedVersion;
-        } else {
-            status = COLOR_YELLOW "Available" COLOR_RESET;
-            versionStr = COLOR_RED "None" COLOR_RESET;
-        }
+  for (const auto& provider : providers) {
+    std::string status = "Available";
+    std::string versionStr = "Not Installed";
 
-        std::cout << std::format("{:<25} {:<15} {:<30} {:<15}", 
-            provider->GetDisplayName(), 
-            provider->GetIdentifier(), 
-            versionStr, 
-            status
-        ) << std::endl;
+    auto installed = manifest.GetInstalledPackageByIdentifier(provider->GetIdentifier());
+    if (installed.has_value()) {
+      status = std::format("{}Installed{}", COLOR_GREEN, COLOR_RESET);
+      versionStr = installed->installedVersion;
+    } else {
+      status = std::format("{}Available{}", COLOR_YELLOW, COLOR_RESET);
+      versionStr = std::format("{}None{}", COLOR_RED, COLOR_RESET);
     }
 
-    return 0;
+    std::cout << std::format("{:<25} {:<15} {:<30} {:<15}", provider->GetDisplayName(),
+                             provider->GetIdentifier(), versionStr, status)
+              << '\n';
+  }
+
+  return 0;
 }
 
 int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId) {
-    auto providers = PackageProviderRegistry::GetRegisteredProviders();
-    auto providerIt = std::find_if(providers.begin(), providers.end(), [&](const auto& p) {
-        return p->GetIdentifier() == packageId;
-    });
+  auto providers = PackageProviderRegistry::GetRegisteredProviders();
+  auto providerIt = std::ranges::find_if(
+      providers, [&](const auto& prov) { return prov->GetIdentifier() == packageId; });
 
-    if (providerIt == providers.end()) {
-        std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not available." << COLOR_RESET << std::endl;
-        return 1;
+  if (providerIt == providers.end()) {
+    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not available."
+              << COLOR_RESET << '\n';
+    return 1;
+  }
+
+  auto* provider = providerIt->get();
+  auto httpClient = HttpClientFactory::CreateDefaultClient();
+
+  std::cout << COLOR_CYAN << "Fetching version info for " << provider->GetDisplayName() << "..."
+            << COLOR_RESET << '\n';
+  auto versions = provider->FetchAvailableVersions(*httpClient);
+
+  std::cout << COLOR_BOLD << "Package ID:   " << COLOR_RESET << provider->GetIdentifier() << '\n';
+  std::cout << COLOR_BOLD << "Name:         " << COLOR_RESET << provider->GetDisplayName() << '\n';
+  std::cout << COLOR_BOLD << "Versions:     " << COLOR_RESET;
+  if (versions.empty()) {
+    std::cout << COLOR_RED << "None available" << COLOR_RESET << '\n';
+  } else {
+    constexpr size_t MAX_VERSION_PREVIEWS = 5;
+    for (size_t i = 0; i < std::min(versions.size(), MAX_VERSION_PREVIEWS); ++i) {
+      if (i > 0) {
+        std::cout << ", ";
+      }
+      std::cout << versions[i];
     }
-
-    auto provider = providerIt->get();
-    auto httpClient = HttpClientFactory::CreateDefaultClient();
-
-    std::cout << COLOR_CYAN << "Fetching version info for " << provider->GetDisplayName() << "..." << COLOR_RESET << std::endl;
-    auto versions = provider->FetchAvailableVersions(*httpClient);
-
-    std::cout << COLOR_BOLD << "Package ID:   " << COLOR_RESET << provider->GetIdentifier() << std::endl;
-    std::cout << COLOR_BOLD << "Name:         " << COLOR_RESET << provider->GetDisplayName() << std::endl;
-    std::cout << COLOR_BOLD << "Versions:     " << COLOR_RESET;
-    if (versions.empty()) {
-        std::cout << COLOR_RED << "None available" << COLOR_RESET << std::endl;
-    } else {
-        for (size_t i = 0; i < std::min(versions.size(), size_t(5)); ++i) {
-            if (i > 0) std::cout << ", ";
-            std::cout << versions[i];
-        }
-        if (versions.size() > 5) {
-            std::cout << " ... (" << (versions.size() - 5) << " more)";
-        }
-        std::cout << std::endl;
+    if (versions.size() > MAX_VERSION_PREVIEWS) {
+      std::cout << " ... (" << (versions.size() - MAX_VERSION_PREVIEWS) << " more)";
     }
-    return 0;
+    std::cout << '\n';
+  }
+  return 0;
 }
 
-int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, const std::string& versionOverride) {
-    auto providers = PackageProviderRegistry::GetRegisteredProviders();
-    auto providerIt = std::find_if(providers.begin(), providers.end(), [&](const auto& p) {
-        return p->GetIdentifier() == packageId;
-    });
+int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId,
+                                                const std::string& versionOverride) {
+  auto providers = PackageProviderRegistry::GetRegisteredProviders();
+  auto providerIt = std::ranges::find_if(
+      providers, [&](const auto& prov) { return prov->GetIdentifier() == packageId; });
 
-    if (providerIt == providers.end()) {
-        std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported or available." << COLOR_RESET << std::endl;
-        return 1;
+  if (providerIt == providers.end()) {
+    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported or available."
+              << COLOR_RESET << '\n';
+    return 1;
+  }
+
+  auto* provider = providerIt->get();
+  auto rootPath = PathResolver::GetDefaultInstallationRootPath();
+  ManifestManager manifest(rootPath);
+  auto httpClient = HttpClientFactory::CreateDefaultClient();
+
+  std::string targetVersion = versionOverride;
+  if (targetVersion.empty()) {
+    std::cout << COLOR_CYAN << "Retrieving latest version for " << provider->GetDisplayName()
+              << "..." << COLOR_RESET << '\n';
+    auto versions = provider->FetchAvailableVersions(*httpClient);
+    if (versions.empty()) {
+      std::cerr << COLOR_RED << "Error: Failed to query remote version registry." << COLOR_RESET
+                << '\n';
+      return 1;
     }
+    targetVersion = versions[0];
+  }
 
-    auto provider = providerIt->get();
-    auto rootPath = PathResolver::GetDefaultInstallationRootPath();
-    ManifestManager manifest(rootPath);
-    auto httpClient = HttpClientFactory::CreateDefaultClient();
+  UrlString downloadUrl = provider->GetDownloadUrl(targetVersion);
+  std::string archiveName = provider->GetArchiveFilename(targetVersion);
+  std::filesystem::path tempArchiveFile =
+      manifest.GetInstallationRootDirectory() / ("temp_" + archiveName);
+  std::filesystem::path targetInstallationDir =
+      manifest.GetInstallationRootDirectory() / provider->GetIdentifier();
 
-    std::string targetVersion = versionOverride;
-    if (targetVersion.empty()) {
-        std::cout << COLOR_CYAN << "Retrieving latest version for " << provider->GetDisplayName() << "..." << COLOR_RESET << std::endl;
-        auto versions = provider->FetchAvailableVersions(*httpClient);
-        if (versions.empty()) {
-            std::cerr << COLOR_RED << "Error: Failed to query remote version registry." << COLOR_RESET << std::endl;
-            return 1;
-        }
-        targetVersion = versions[0];
+  std::cout << COLOR_CYAN
+            << std::format("Installing {} (Version: {})", provider->GetDisplayName(), targetVersion)
+            << COLOR_RESET << '\n';
+  std::cout << "Download URL: " << downloadUrl << '\n';
+
+  // Ensure parent directories exist
+  std::filesystem::create_directories(manifest.GetInstallationRootDirectory());
+
+  // Download File
+  bool downloadSuccess = httpClient->DownloadFile(downloadUrl, tempArchiveFile, [](float progress) {
+    constexpr int BAR_WIDTH = 40;
+    constexpr float PROGRESS_PERCENTAGE_MULTIPLIER = 100.0F;
+    std::cout << "\r[";
+    const int pos = static_cast<int>(static_cast<float>(BAR_WIDTH) * progress);
+    for (int i = 0; i < BAR_WIDTH; ++i) {
+      if (i < pos) {
+        std::cout << "=";
+      } else if (i == pos) {
+        std::cout << ">";
+      } else {
+        std::cout << " ";
+      }
     }
+    std::cout << "] " << static_cast<int>(progress * PROGRESS_PERCENTAGE_MULTIPLIER) << " %"
+              << std::flush;
+  });
+  std::cout << '\n';
 
-    UrlString downloadUrl = provider->GetDownloadUrl(targetVersion);
-    std::string archiveName = provider->GetArchiveFilename(targetVersion);
-    std::filesystem::path tempArchiveFile = manifest.GetInstallationRootDirectory() / ("temp_" + archiveName);
-    std::filesystem::path targetInstallationDir = manifest.GetInstallationRootDirectory() / provider->GetIdentifier();
-
-    std::cout << COLOR_CYAN << std::format("Installing {} (Version: {})", provider->GetDisplayName(), targetVersion) << COLOR_RESET << std::endl;
-    std::cout << "Download URL: " << downloadUrl << std::endl;
-
-    // Ensure parent directories exist
-    std::filesystem::create_directories(manifest.GetInstallationRootDirectory());
-
-    // Download File
-    bool downloadSuccess = httpClient->DownloadFile(downloadUrl, tempArchiveFile, [](float progress) {
-        int barWidth = 40;
-        std::cout << "\r[";
-        int pos = static_cast<int>(barWidth * progress);
-        for (int i = 0; i < barWidth; ++i) {
-            if (i < pos) std::cout << "=";
-            else if (i == pos) std::cout << ">";
-            else std::cout << " ";
-        }
-        std::cout << "] " << static_cast<int>(progress * 100.0) << " %" << std::flush;
-    });
-    std::cout << std::endl;
-
-    if (!downloadSuccess) {
-        std::cerr << COLOR_RED << "Error: Download failed." << COLOR_RESET << std::endl;
-        if (std::filesystem::exists(tempArchiveFile)) {
-            std::filesystem::remove(tempArchiveFile);
-        }
-        return 1;
+  if (!downloadSuccess) {
+    std::cerr << COLOR_RED << "Error: Download failed." << COLOR_RESET << '\n';
+    if (std::filesystem::exists(tempArchiveFile)) {
+      std::filesystem::remove(tempArchiveFile);
     }
+    return 1;
+  }
 
-    // Perform Extraction
-    std::cout << COLOR_CYAN << "Extracting package files..." << COLOR_RESET << std::endl;
-    std::filesystem::create_directories(targetInstallationDir);
+  // Perform Extraction
+  std::cout << COLOR_CYAN << "Extracting package files..." << COLOR_RESET << '\n';
+  std::filesystem::create_directories(targetInstallationDir);
 
-    // Construct clean, robust command line for extraction based on extension
-    std::vector<std::string> extractionCommand;
-#if defined(_WIN32)
-    // On Windows, built-in tar.exe handles zip, 7z, tar.xz etc. flawlessly.
-    extractionCommand = {
-        "tar.exe",
-        "-xf",
-        tempArchiveFile.string(),
-        "-C",
-        targetInstallationDir.string()
-    };
+  // Construct clean, robust command line for extraction based on extension
+  std::vector<std::string> extractionCommand;
+#ifdef _WIN32
+  // On Windows, built-in tar.exe handles zip, 7z, tar.xz etc. flawlessly.
+  extractionCommand = {"tar.exe", "-xf", tempArchiveFile.string(), "-C",
+                       targetInstallationDir.string()};
 #else
-    if (tempArchiveFile.extension() == ".zip") {
-        extractionCommand = {
-            "unzip",
-            "-q",
-            "-o",
-            tempArchiveFile.string(),
-            "-d",
-            targetInstallationDir.string()
-        };
-    } else {
-        // tar handles gz, xz on Unix
-        extractionCommand = {
-            "tar",
-            "-xf",
-            tempArchiveFile.string(),
-            "-C",
-            targetInstallationDir.string()
-        };
-    }
+  if (tempArchiveFile.extension() == ".zip") {
+    extractionCommand = {
+        "unzip", "-q", "-o", tempArchiveFile.string(), "-d", targetInstallationDir.string()};
+  } else {
+    // tar handles gz, xz on Unix
+    extractionCommand = {"tar", "-xf", tempArchiveFile.string(), "-C",
+                         targetInstallationDir.string()};
+  }
 #endif
 
-    auto extractionResult = ProcessExecutor::ExecuteCommand(extractionCommand);
-    std::filesystem::remove(tempArchiveFile); // Cleanup downloaded archive
+  auto extractionResult = ProcessExecutor::ExecuteCommand(extractionCommand);
+  std::filesystem::remove(tempArchiveFile); // Cleanup downloaded archive
 
-    if (!extractionResult.has_value() || extractionResult->exitCode != 0) {
-        std::cerr << COLOR_RED << "Error: Extraction failed." << COLOR_RESET << std::endl;
-        if (extractionResult.has_value()) {
-            std::cerr << "Details: " << extractionResult->standardOutput << std::endl;
-        }
-        return 1;
+  if (!extractionResult.has_value() || extractionResult->exitCode != 0) {
+    std::cerr << COLOR_RED << "Error: Extraction failed." << COLOR_RESET << '\n';
+    if (extractionResult.has_value()) {
+      std::cerr << "Details: " << extractionResult->standardOutput << '\n';
     }
+    return 1;
+  }
 
-    // Track in manifest
-    InstalledPackageState state;
-    state.identifier = provider->GetIdentifier();
-    state.installedVersion = targetVersion;
-    state.installationPath = targetInstallationDir;
-    
-    // Get current date
-    auto now = std::chrono::system_clock::now();
-    std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-    std::tm timeStruct = *std::localtime(&nowTime);
-    state.installationDate = std::format("{:04}-{:02}-{:02}", 
-        timeStruct.tm_year + 1900, timeStruct.tm_mon + 1, timeStruct.tm_mday);
+  // Track in manifest
+  InstalledPackageState state;
+  state.identifier = provider->GetIdentifier();
+  state.installedVersion = targetVersion;
+  state.installationPath = targetInstallationDir;
 
-    manifest.RegisterOrUpdateInstalledPackage(state);
+  // Get current date
+  auto now = std::chrono::system_clock::now();
+  std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+  std::tm timeStruct = *std::localtime(&nowTime);
+  constexpr int TM_YEAR_OFFSET = 1900;
+  constexpr int TM_MON_OFFSET = 1;
+  state.installationDate = std::format("{:04}-{:02}-{:02}", timeStruct.tm_year + TM_YEAR_OFFSET,
+                                       timeStruct.tm_mon + TM_MON_OFFSET, timeStruct.tm_mday);
 
-    std::cout << COLOR_GREEN << "Installation of " << provider->GetDisplayName() << " completed successfully!" << COLOR_RESET << std::endl;
-    std::cout << "Path: " << targetInstallationDir.string() << std::endl;
-    return 0;
+  manifest.RegisterOrUpdateInstalledPackage(state);
+
+  std::cout << COLOR_GREEN << "Installation of " << provider->GetDisplayName()
+            << " completed successfully!" << COLOR_RESET << '\n';
+  std::cout << "Path: " << targetInstallationDir.string() << '\n';
+  return 0;
 }
 
-int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, const std::string& versionOverride) {
-    auto providers = PackageProviderRegistry::GetRegisteredProviders();
-    auto providerIt = std::find_if(providers.begin(), providers.end(), [&](const auto& p) {
-        return p->GetIdentifier() == packageId;
-    });
+int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId,
+                                                 const std::string& versionOverride) {
+  auto providers = PackageProviderRegistry::GetRegisteredProviders();
+  auto providerIt = std::ranges::find_if(
+      providers, [&](const auto& prov) { return prov->GetIdentifier() == packageId; });
 
-    if (providerIt == providers.end()) {
-        std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported or available." << COLOR_RESET << std::endl;
-        return 1;
+  if (providerIt == providers.end()) {
+    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported or available."
+              << COLOR_RESET << '\n';
+    return 1;
+  }
+
+  auto* provider = providerIt->get();
+  auto httpClient = HttpClientFactory::CreateDefaultClient();
+
+  std::string targetVersion = versionOverride;
+  if (targetVersion.empty()) {
+    std::cout << COLOR_CYAN << "Retrieving latest version for " << provider->GetDisplayName()
+              << "..." << COLOR_RESET << '\n';
+    auto versions = provider->FetchAvailableVersions(*httpClient);
+    if (versions.empty()) {
+      std::cerr << COLOR_RED << "Error: Failed to query remote version registry." << COLOR_RESET
+                << '\n';
+      return 1;
     }
+    targetVersion = versions[0];
+  }
 
-    auto provider = providerIt->get();
-    auto httpClient = HttpClientFactory::CreateDefaultClient();
+  UrlString downloadUrl = provider->GetDownloadUrl(targetVersion);
+  std::string archiveName = provider->GetArchiveFilename(targetVersion);
+  std::filesystem::path targetFile = std::filesystem::current_path() / archiveName;
 
-    std::string targetVersion = versionOverride;
-    if (targetVersion.empty()) {
-        std::cout << COLOR_CYAN << "Retrieving latest version for " << provider->GetDisplayName() << "..." << COLOR_RESET << std::endl;
-        auto versions = provider->FetchAvailableVersions(*httpClient);
-        if (versions.empty()) {
-            std::cerr << COLOR_RED << "Error: Failed to query remote version registry." << COLOR_RESET << std::endl;
-            return 1;
-        }
-        targetVersion = versions[0];
+  std::cout << COLOR_CYAN
+            << std::format("Downloading {} (Version: {}) to current directory",
+                           provider->GetDisplayName(), targetVersion)
+            << COLOR_RESET << '\n';
+  std::cout << "Destination:  " << targetFile.string() << '\n';
+  std::cout << "Download URL: " << downloadUrl << '\n';
+
+  // Download File
+  bool downloadSuccess = httpClient->DownloadFile(downloadUrl, targetFile, [](float progress) {
+    constexpr int BAR_WIDTH = 40;
+    constexpr float PROGRESS_PERCENTAGE_MULTIPLIER = 100.0F;
+    std::cout << "\r[";
+    const int pos = static_cast<int>(static_cast<float>(BAR_WIDTH) * progress);
+    for (int i = 0; i < BAR_WIDTH; ++i) {
+      if (i < pos) {
+        std::cout << "=";
+      } else if (i == pos) {
+        std::cout << ">";
+      } else {
+        std::cout << " ";
+      }
     }
+    std::cout << "] " << static_cast<int>(progress * PROGRESS_PERCENTAGE_MULTIPLIER) << " %"
+              << std::flush;
+  });
+  std::cout << '\n';
 
-    UrlString downloadUrl = provider->GetDownloadUrl(targetVersion);
-    std::string archiveName = provider->GetArchiveFilename(targetVersion);
-    std::filesystem::path targetFile = std::filesystem::current_path() / archiveName;
-
-    std::cout << COLOR_CYAN << std::format("Downloading {} (Version: {}) to current directory", provider->GetDisplayName(), targetVersion) << COLOR_RESET << std::endl;
-    std::cout << "Destination:  " << targetFile.string() << std::endl;
-    std::cout << "Download URL: " << downloadUrl << std::endl;
-
-    // Download File
-    bool downloadSuccess = httpClient->DownloadFile(downloadUrl, targetFile, [](float progress) {
-        int barWidth = 40;
-        std::cout << "\r[";
-        int pos = static_cast<int>(barWidth * progress);
-        for (int i = 0; i < barWidth; ++i) {
-            if (i < pos) std::cout << "=";
-            else if (i == pos) std::cout << ">";
-            else std::cout << " ";
-        }
-        std::cout << "] " << static_cast<int>(progress * 100.0) << " %" << std::flush;
-    });
-    std::cout << std::endl;
-
-    if (!downloadSuccess) {
-        std::cerr << COLOR_RED << "Error: Download failed." << COLOR_RESET << std::endl;
-        if (std::filesystem::exists(targetFile)) {
-            std::filesystem::remove(targetFile);
-        }
-        return 1;
+  if (!downloadSuccess) {
+    std::cerr << COLOR_RED << "Error: Download failed." << COLOR_RESET << '\n';
+    if (std::filesystem::exists(targetFile)) {
+      std::filesystem::remove(targetFile);
     }
+    return 1;
+  }
 
-    std::cout << COLOR_GREEN << "Download completed successfully!" << COLOR_RESET << std::endl;
-    return 0;
+  std::cout << COLOR_GREEN << "Download completed successfully!" << COLOR_RESET << '\n';
+  return 0;
 }
 
 int CommandLineInterface::ExecuteUninstallCommand(const std::string& packageId) {
-    auto rootPath = PathResolver::GetDefaultInstallationRootPath();
-    ManifestManager manifest(rootPath);
+  auto rootPath = PathResolver::GetDefaultInstallationRootPath();
+  ManifestManager manifest(rootPath);
 
-    auto packageState = manifest.GetInstalledPackageByIdentifier(packageId);
-    if (!packageState.has_value()) {
-        std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not registered as installed." << COLOR_RESET << std::endl;
-        return 1;
+  auto packageState = manifest.GetInstalledPackageByIdentifier(packageId);
+  if (!packageState.has_value()) {
+    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not registered as installed."
+              << COLOR_RESET << '\n';
+    return 1;
+  }
+
+  std::cout << COLOR_CYAN << "Uninstalling package at " << packageState->installationPath.string()
+            << "..." << COLOR_RESET << '\n';
+
+  try {
+    if (std::filesystem::exists(packageState->installationPath)) {
+      std::filesystem::remove_all(packageState->installationPath);
     }
 
-    std::cout << COLOR_CYAN << "Uninstalling package at " << packageState->installationPath.string() << "..." << COLOR_RESET << std::endl;
+    manifest.UnregisterInstalledPackage(packageId);
 
-    try {
-        if (std::filesystem::exists(packageState->installationPath)) {
-            std::filesystem::remove_all(packageState->installationPath);
-        }
-        
-        manifest.UnregisterInstalledPackage(packageId);
-
-        std::cout << COLOR_GREEN << "Uninstall completed successfully!" << COLOR_RESET << std::endl;
-        return 0;
-    } catch (const std::exception& ex) {
-        std::cerr << COLOR_RED << "Error during uninstall: " << ex.what() << COLOR_RESET << std::endl;
-        return 1;
-    }
+    std::cout << COLOR_GREEN << "Uninstall completed successfully!" << COLOR_RESET << '\n';
+    return 0;
+  } catch (const std::exception& ex) {
+    std::cerr << COLOR_RED << "Error during uninstall: " << ex.what() << COLOR_RESET << '\n';
+    return 1;
+  }
 }
 
 int CommandLineInterface::ExecutePathCommand(const std::vector<std::string>& pathArguments) {
-    auto rootPath = PathResolver::GetDefaultInstallationRootPath();
-    ManifestManager manifest(rootPath);
+  auto rootPath = PathResolver::GetDefaultInstallationRootPath();
+  ManifestManager manifest(rootPath);
 
-    if (pathArguments.empty()) {
-        std::cout << "Current Root Installation Directory: " << manifest.GetInstallationRootDirectory().string() << std::endl;
-        return 0;
-    }
+  if (pathArguments.empty()) {
+    std::cout << "Current Root Installation Directory: "
+              << manifest.GetInstallationRootDirectory().string() << '\n';
+    return 0;
+  }
 
-    std::filesystem::path newPath(pathArguments[0]);
-    std::cout << COLOR_CYAN << "Changing root installation directory to: " << newPath.string() << COLOR_RESET << std::endl;
+  std::filesystem::path newPath(pathArguments[0]);
+  std::cout << COLOR_CYAN << "Changing root installation directory to: " << newPath.string()
+            << COLOR_RESET << '\n';
 
-    try {
-        std::filesystem::create_directories(newPath);
-        // Move old manifest if it exists to keep package state? Or start a new manifest.
-        // We'll start a new manifest at that path.
-        ManifestManager newManifest(newPath);
-        newManifest.SaveManifestToFile();
-        
-        std::cout << COLOR_GREEN << "Path updated successfully!" << COLOR_RESET << std::endl;
-        return 0;
-    } catch (const std::exception& ex) {
-        std::cerr << COLOR_RED << "Failed to change path: " << ex.what() << COLOR_RESET << std::endl;
-        return 1;
-    }
+  try {
+    std::filesystem::create_directories(newPath);
+    // Move old manifest if it exists to keep package state? Or start a new manifest.
+    // We'll start a new manifest at that path.
+    ManifestManager newManifest(newPath);
+    newManifest.SaveManifestToFile();
+
+    std::cout << COLOR_GREEN << "Path updated successfully!" << COLOR_RESET << '\n';
+    return 0;
+  } catch (const std::exception& ex) {
+    std::cerr << COLOR_RED << "Failed to change path: " << ex.what() << COLOR_RESET << '\n';
+    return 1;
+  }
 }
 
 } // namespace CatUpdate
 
 #if defined(_WIN32) && defined(UNICODE)
-int wmain(int argc, wchar_t* argv[]) {
+int wmain(int argc, wchar_t* argv[]) noexcept {
+  try {
     std::vector<std::string> args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {
-        args.push_back(CatUpdate::Utils::ToString(argv[i]));
+      args.push_back(CatUpdate::Utils::ToString(
+          argv[i])); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     return CatUpdate::CommandLineInterface::Run(args);
+  } catch (const std::exception& ex) {
+    std::cerr << "Unhandled exception: " << ex.what() << '\n';
+    return 1;
+  } catch (...) {
+    std::cerr << "Unknown unhandled exception occurred\n";
+    return 1;
+  }
 }
 #else
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) noexcept {
+  try {
     std::vector<std::string> args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {
-        args.push_back(argv[i]);
+      args.emplace_back(argv[i]); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
     return CatUpdate::CommandLineInterface::Run(args);
+  } catch (const std::exception& ex) {
+    std::cerr << "Unhandled exception: " << ex.what() << '\n';
+    return 1;
+  } catch (...) {
+    std::cerr << "Unknown unhandled exception occurred\n";
+    return 1;
+  }
 }
 #endif

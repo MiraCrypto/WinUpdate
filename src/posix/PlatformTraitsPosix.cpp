@@ -3,26 +3,26 @@
 namespace CatUpdate {
 
 PlatformType PlatformTraits::GetPlatformType() {
-#if defined(__APPLE__)
-    return PlatformType::macOS;
+#ifdef __APPLE__
+  return PlatformType::macOS;
 #else
-    return PlatformType::Linux;
+  return PlatformType::Linux;
 #endif
 }
 
 std::string PlatformTraits::GetPlatformNameString() {
-#if defined(__APPLE__)
-    return "darwin-x64";
+#ifdef __APPLE__
+  return "darwin-x64";
 #else
-    return "linux-x64";
+  return "linux-x64";
 #endif
 }
 
 std::string PlatformTraits::GetArchiveExtension() {
-#if defined(__APPLE__)
-    return ".tar.gz";
+#ifdef __APPLE__
+  return ".tar.gz";
 #else
-    return ".tar.xz";
+  return ".tar.xz";
 #endif
 }
 

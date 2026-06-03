@@ -4,6 +4,27 @@ project(CatUpdate VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Export compile commands database for language servers and static analysis
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Find and configure clang-tidy static analysis tool
+find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+if(NOT CLANG_TIDY_EXE)
+    execute_process(
+        COMMAND brew --prefix llvm
+        OUTPUT_VARIABLE BREW_LLVM_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(BREW_LLVM_PREFIX)
+        find_program(CLANG_TIDY_EXE NAMES clang-tidy HINTS "${BREW_LLVM_PREFIX}/bin")
+    endif()
+endif()
+
+if(CLANG_TIDY_EXE AND NOT CMAKE_CROSSCOMPILING)
+    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXE})
+endif()
+
 # =============================================================================
 # Core Static Library Target
 # =============================================================================
