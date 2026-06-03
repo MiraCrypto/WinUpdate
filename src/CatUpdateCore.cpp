@@ -5,28 +5,14 @@
 #include <format>
 #include <chrono>
 
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <shlobj.h>
-#else
-#include <unistd.h>
-#include <sys/types.h>
-#include <pwd.h>
-#endif
-
 namespace CatUpdate {
 
 // -----------------------------------------------------------------------------
-// SystemLogger Implementation
+// SystemLogger Common Interface (Delegates debug outputs to platform files)
 // -----------------------------------------------------------------------------
 
 void SystemLogger::LogInformation(const std::string& message) {
     std::cout << "[INFO] " << message << std::endl;
-#if defined(_WIN32)
-    std::wstring wMessage = Utils::ToWString(message);
-    OutputDebugStringW((L"[CatUpdate INFO] " + wMessage + L"\n").c_str());
-#endif
 }
 
 void SystemLogger::LogError(const std::string& message, const std::optional<std::string>& exceptionMessage) {
@@ -35,55 +21,6 @@ void SystemLogger::LogError(const std::string& message, const std::optional<std:
         std::cerr << " Details: " << exceptionMessage.value();
     }
     std::cerr << std::endl;
-#if defined(_WIN32)
-    std::wstring wMessage = Utils::ToWString(message);
-    OutputDebugStringW((L"[CatUpdate ERROR] " + wMessage + L"\n").c_str());
-#endif
-}
-
-// -----------------------------------------------------------------------------
-// PathResolver Implementation
-// -----------------------------------------------------------------------------
-
-std::filesystem::path PathResolver::GetDefaultInstallationRootPath() {
-#if defined(_WIN32)
-    WCHAR publicDocumentsPath[MAX_PATH];
-    // Retrieve C:\Users\Public\Documents path
-    HRESULT result = SHGetFolderPathW(NULL, CSIDL_COMMON_DOCUMENTS, NULL, SHGFP_TYPE_CURRENT, publicDocumentsPath);
-    if (SUCCEEDED(result)) {
-        return std::filesystem::path(publicDocumentsPath);
-    }
-    // Fallback to a standard folder if SHGetFolderPathW fails
-    return std::filesystem::path("C:\\Users\\Public\\Documents");
-#else
-    // On Linux/macOS: ~/.local
-    return GetUserHomeDirectory() / ".local";
-#endif
-}
-
-std::filesystem::path PathResolver::GetUserHomeDirectory() {
-#if defined(_WIN32)
-    WCHAR userProfilePath[MAX_PATH];
-    HRESULT result = SHGetFolderPathW(NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, userProfilePath);
-    if (SUCCEEDED(result)) {
-        return std::filesystem::path(userProfilePath);
-    }
-    return std::filesystem::path("C:\\Users\\Default");
-#else
-    // Fetch HOME environment variable
-    const char* homeDirectoryEnv = std::getenv("HOME");
-    if (homeDirectoryEnv != nullptr && std::strlen(homeDirectoryEnv) > 0) {
-        return std::filesystem::path(homeDirectoryEnv);
-    }
-
-    // Fallback via password entries
-    struct passwd* passwordEntry = getpwuid(getuid());
-    if (passwordEntry != nullptr && passwordEntry->pw_dir != nullptr) {
-        return std::filesystem::path(passwordEntry->pw_dir);
-    }
-
-    return std::filesystem::path("/");
-#endif
 }
 
 // -----------------------------------------------------------------------------
@@ -143,7 +80,6 @@ bool ManifestManager::LoadManifestFromFile() {
 bool ManifestManager::SaveManifestToFile() {
     auto filePath = GetManifestFilePath();
     
-    // Ensure directory exists
     try {
         std::filesystem::create_directories(m_installationRootDirectory);
     } catch (const std::exception& ex) {
@@ -204,34 +140,6 @@ bool ManifestManager::IsPackageInstalled(const PackageIdentifier& packageIdentif
 
 std::vector<InstalledPackageState> ManifestManager::GetInstalledPackages() const {
     return m_installedPackages;
-}
-
-// -----------------------------------------------------------------------------
-// Utils Implementation
-// -----------------------------------------------------------------------------
-
-std::wstring Utils::ToWString(const std::string& utf8Str) {
-#if defined(_WIN32)
-    if (utf8Str.empty()) return L"";
-    int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), NULL, 0);
-    std::wstring wstrTo(sizeNeeded, 0);
-    MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), &wstrTo[0], sizeNeeded);
-    return wstrTo;
-#else
-    return std::wstring(utf8Str.begin(), utf8Str.end());
-#endif
-}
-
-std::string Utils::ToString(const std::wstring& utf16Str) {
-#if defined(_WIN32)
-    if (utf16Str.empty()) return "";
-    int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), NULL, 0, NULL, NULL);
-    std::string strTo(sizeNeeded, 0);
-    WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), &strTo[0], sizeNeeded, NULL, NULL);
-    return strTo;
-#else
-    return std::string(utf16Str.begin(), utf16Str.end());
-#endif
 }
 
 } // namespace CatUpdate

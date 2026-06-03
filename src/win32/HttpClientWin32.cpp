@@ -1,18 +1,13 @@
 #include "HttpClient.hpp"
-#include "ProcessExecutor.hpp"
+#include "CatUpdateCore.hpp"
 #include <fstream>
-#include <iostream>
-#include <sstream>
+#include <vector>
 
-#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winhttp.h>
-#endif
 
 namespace CatUpdate {
-
-#if defined(_WIN32)
 
 class WindowsHttpClient : public HttpClient {
 public:
@@ -21,7 +16,7 @@ public:
         const std::filesystem::path& destinationFilePath,
         const DownloadProgressCallback& progressCallback
     ) override {
-        // Parse components of the URL
+        // Parse components of the URL using Unicode utility
         std::wstring wUrl = Utils::ToWString(sourceUrl);
         URL_COMPONENTS urlComponents = { sizeof(urlComponents) };
         urlComponents.dwHostNameLength = static_cast<DWORD>(-1);
@@ -210,7 +205,7 @@ public:
             return "";
         }
 
-        // Set custom User-Agent headers for GitHub Releases API which requires user agent
+        // Set custom User-Agent headers for GitHub Releases API
         std::wstring headers = L"User-Agent: CatUpdate/1.0\r\n";
         WinHttpAddRequestHeaders(
             requestHandle,
@@ -247,71 +242,8 @@ public:
     }
 };
 
-#else // POSIX implementation (Linux / macOS)
-
-class PosixCurlHttpClient : public HttpClient {
-public:
-    bool DownloadFile(
-        const UrlString& sourceUrl,
-        const std::filesystem::path& destinationFilePath,
-        const DownloadProgressCallback& progressCallback
-    ) override {
-        // Simply execute: curl -L -s -o <destination> <url>
-        // If progress callback is defined, we can execute it silently or simulate 50%-100% steps,
-        // or just call curl cleanly. Since curl handles the download progress nicely on screen
-        // when in command line, we run it synchronously.
-        SystemLogger::LogInformation("Downloading " + sourceUrl + " via curl...");
-        
-        std::vector<std::string> command = {
-            "curl",
-            "-L",
-            "-s",
-            "-o",
-            destinationFilePath.string(),
-            sourceUrl
-        };
-
-        if (progressCallback) {
-            progressCallback(0.1f); // Simulate startup
-        }
-
-        auto executionResult = ProcessExecutor::ExecuteCommand(command);
-        
-        if (progressCallback && executionResult && executionResult->exitCode == 0) {
-            progressCallback(1.0f); // Finished
-        }
-
-        return executionResult.has_value() && executionResult->exitCode == 0;
-    }
-
-    std::string FetchStringContent(const UrlString& sourceUrl) override {
-        // Run curl to print response to stdout: curl -L -s -A "CatUpdate/1.0" <url>
-        std::vector<std::string> command = {
-            "curl",
-            "-L",
-            "-s",
-            "-A",
-            "CatUpdate/1.0",
-            sourceUrl
-        };
-
-        auto executionResult = ProcessExecutor::ExecuteCommand(command);
-        if (executionResult && executionResult->exitCode == 0) {
-            return executionResult->standardOutput;
-        }
-        
-        return "";
-    }
-};
-
-#endif
-
 std::unique_ptr<HttpClient> HttpClientFactory::CreateDefaultClient() {
-#if defined(_WIN32)
     return std::make_unique<WindowsHttpClient>();
-#else
-    return std::make_unique<PosixCurlHttpClient>();
-#endif
 }
 
 } // namespace CatUpdate

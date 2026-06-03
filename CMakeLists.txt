@@ -7,37 +7,57 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories(include)
 
 # -----------------------------------------------------------------------------
-# Cross-Platform Sources and Targets
+# Common Platform-Independent Core Sources
 # -----------------------------------------------------------------------------
-
-# Common library source files
 set(CORE_SOURCES
     src/CatUpdateCore.cpp
-    src/HttpClient.cpp
-    src/ProcessExecutor.cpp
     src/Providers.cpp
 )
 
-# Add CLI executable (Runs on Windows, Linux, macOS)
+# -----------------------------------------------------------------------------
+# Platform-Specific Compilation Units
+# -----------------------------------------------------------------------------
+if(WIN32)
+    set(PLATFORM_SOURCES
+        src/win32/CatUpdateCoreWin32.cpp
+        src/win32/HttpClientWin32.cpp
+        src/win32/ProcessExecutorWin32.cpp
+        src/win32/PlatformTraitsWin32.cpp
+    )
+else()
+    set(PLATFORM_SOURCES
+        src/posix/CatUpdateCorePosix.cpp
+        src/posix/HttpClientPosix.cpp
+        src/posix/ProcessExecutorPosix.cpp
+        src/posix/PlatformTraitsPosix.cpp
+    )
+endif()
+
+# -----------------------------------------------------------------------------
+# Compilation Target: Command-Line Interface (CLI)
+# -----------------------------------------------------------------------------
 add_executable(catupdate
     src/cli_main.cpp
     ${CORE_SOURCES}
+    ${PLATFORM_SOURCES}
 )
 
-# Add Unit Tests executable
+# -----------------------------------------------------------------------------
+# Compilation Target: Unit Test Suite
+# -----------------------------------------------------------------------------
 add_executable(catupdate-tests
     tests/test_main.cpp
     tests/test_core.cpp
     tests/test_providers.cpp
     ${CORE_SOURCES}
+    ${PLATFORM_SOURCES}
 )
 
 # -----------------------------------------------------------------------------
-# Platform Specific Flags & Libraries
+# Platform Flags & Libraries Linking
 # -----------------------------------------------------------------------------
-
 if(WIN32)
-    # Link Windows libraries
+    # Link native Windows libraries
     target_link_libraries(catupdate PRIVATE
         winhttp
         shlwapi
@@ -49,14 +69,14 @@ if(WIN32)
         ole32
     )
 
-    # Define GUI executable source
+    # Compilation Target: Win32 Demoscene GUI (Windows-only)
     set(GUI_SOURCES
         src/gui_main.cpp
         resources/resources.rc
         ${CORE_SOURCES}
+        ${PLATFORM_SOURCES}
     )
 
-    # GUI target (WIN32 adds -mwindows for MinGW cross compile)
     add_executable(catupdate-gui WIN32 ${GUI_SOURCES})
     
     target_link_libraries(catupdate-gui PRIVATE
@@ -69,7 +89,7 @@ if(WIN32)
         kernel32
     )
 
-    # Enable Unicode, target modern Windows 10+
+    # Unicode Support and Modern Windows API Targets (Windows 10+)
     target_compile_definitions(catupdate PRIVATE UNICODE _UNICODE _WIN32_WINNT=0x0A00)
     target_compile_definitions(catupdate-tests PRIVATE UNICODE _UNICODE _WIN32_WINNT=0x0A00)
     target_compile_definitions(catupdate-gui PRIVATE UNICODE _UNICODE _WIN32_WINNT=0x0A00)
@@ -82,14 +102,13 @@ if(WIN32)
     target_link_options(catupdate-tests PRIVATE -municode -static)
     target_link_options(catupdate-gui PRIVATE -municode -static)
 else()
-    # Linux/macOS - standard configurations
-    # Under Linux, standard pthread might be needed for std::thread
+    # POSIX threads linkage for standard threads on Linux
     find_package(Threads REQUIRED)
     target_link_libraries(catupdate PRIVATE Threads::Threads)
     target_link_libraries(catupdate-tests PRIVATE Threads::Threads)
 endif()
 
-# Stripping binary in Release mode
+# Stripping binary symbols in Release mode (Windows MinGW optimizations)
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     if(WIN32)
         set_target_properties(catupdate PROPERTIES LINK_FLAGS "-s")

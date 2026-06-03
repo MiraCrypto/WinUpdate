@@ -1,4 +1,5 @@
 #include "Providers.hpp"
+#include "PlatformTraits.hpp"
 #include "json.hpp"
 #include <format>
 #include <algorithm>
@@ -46,29 +47,24 @@ std::vector<PackageVersion> NodeJsPackageProvider::FetchAvailableVersions(HttpCl
             }
         }
     } catch (...) {
-        // Safely ignore parse exceptions and return empty/partial results
     }
     return versions;
 }
 
 UrlString NodeJsPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-#if defined(_WIN32)
-    return std::format("https://nodejs.org/dist/{0}/node-{0}-win-x64.zip", version);
-#elif defined(__APPLE__)
-    return std::format("https://nodejs.org/dist/{0}/node-{0}-darwin-x64.tar.gz", version);
-#else
-    return std::format("https://nodejs.org/dist/{0}/node-{0}-linux-x64.tar.xz", version);
-#endif
+    return std::format("https://nodejs.org/dist/{0}/node-{0}-{1}{2}", 
+        version, 
+        PlatformTraits::GetPlatformNameString(), 
+        PlatformTraits::GetArchiveExtension()
+    );
 }
 
 std::string NodeJsPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-#if defined(_WIN32)
-    return std::format("node-{}-win-x64.zip", version);
-#elif defined(__APPLE__)
-    return std::format("node-{}-darwin-x64.tar.gz", version);
-#else
-    return std::format("node-{}-linux-x64.tar.xz", version);
-#endif
+    return std::format("node-{}-{}{}", 
+        version, 
+        PlatformTraits::GetPlatformNameString(), 
+        PlatformTraits::GetArchiveExtension()
+    );
 }
 
 // -----------------------------------------------------------------------------
@@ -105,23 +101,21 @@ std::vector<PackageVersion> VSCodiumPackageProvider::FetchAvailableVersions(Http
 }
 
 UrlString VSCodiumPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-#if defined(_WIN32)
-    return std::format("https://github.com/VSCodium/vscodium/releases/download/{0}/VSCodium-win32-x64-{0}.zip", version);
-#elif defined(__APPLE__)
-    return std::format("https://github.com/VSCodium/vscodium/releases/download/{0}/VSCodium-darwin-x64-{0}.zip", version);
-#else
-    return std::format("https://github.com/VSCodium/vscodium/releases/download/{0}/VSCodium-linux-x64-{0}.tar.gz", version);
-#endif
+    std::string platformName = (PlatformTraits::GetPlatformType() == PlatformType::Windows) ? "win32-x64" : PlatformTraits::GetPlatformNameString();
+    return std::format("https://github.com/VSCodium/vscodium/releases/download/{0}/VSCodium-{1}-{0}{2}",
+        version,
+        platformName,
+        PlatformTraits::GetArchiveExtension()
+    );
 }
 
 std::string VSCodiumPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-#if defined(_WIN32)
-    return std::format("VSCodium-win32-x64-{}.zip", version);
-#elif defined(__APPLE__)
-    return std::format("VSCodium-darwin-x64-{}.zip", version);
-#else
-    return std::format("VSCodium-linux-x64-{}.tar.gz", version);
-#endif
+    std::string platformName = (PlatformTraits::GetPlatformType() == PlatformType::Windows) ? "win32-x64" : PlatformTraits::GetPlatformNameString();
+    return std::format("VSCodium-{}-{}{}",
+        platformName,
+        version,
+        PlatformTraits::GetArchiveExtension()
+    );
 }
 
 // -----------------------------------------------------------------------------
@@ -137,16 +131,10 @@ PackageName PythonPackageProvider::GetDisplayName() const {
 }
 
 bool PythonPackageProvider::IsPlatformSupported() const {
-#if defined(_WIN32)
-    return true;
-#else
-    return false; // On Linux/macOS, standard Python is preferred
-#endif
+    return PlatformTraits::GetPlatformType() == PlatformType::Windows;
 }
 
 std::vector<PackageVersion> PythonPackageProvider::FetchAvailableVersions(HttpClient& /*httpClient*/) {
-    // Embeddable Python releases do not have a clean standalone JSON API.
-    // Returning standard active versions.
     return { "3.12.3", "3.11.9", "3.10.11" };
 }
 
@@ -176,13 +164,10 @@ bool OpenJdkPackageProvider::IsPlatformSupported() const {
 
 std::vector<PackageVersion> OpenJdkPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
     std::vector<PackageVersion> versions;
-#if defined(_WIN32)
-    std::string queryUrl = "https://api.adoptium.net/v3/info/release_names?project=jdk&vendor=eclipse&heap_size=normal&image_type=jdk&architecture=x64&os=windows";
-#elif defined(__APPLE__)
-    std::string queryUrl = "https://api.adoptium.net/v3/info/release_names?project=jdk&vendor=eclipse&heap_size=normal&image_type=jdk&architecture=x64&os=mac";
-#else
-    std::string queryUrl = "https://api.adoptium.net/v3/info/release_names?project=jdk&vendor=eclipse&heap_size=normal&image_type=jdk&architecture=x64&os=linux";
-#endif
+    std::string osQuery = (PlatformTraits::GetPlatformType() == PlatformType::Windows) ? "windows" :
+                          ((PlatformTraits::GetPlatformType() == PlatformType::macOS) ? "mac" : "linux");
+
+    std::string queryUrl = std::format("https://api.adoptium.net/v3/info/release_names?project=jdk&vendor=eclipse&heap_size=normal&image_type=jdk&architecture=x64&os={}", osQuery);
 
     std::string rawJson = FetchRemoteJson(httpClient, queryUrl);
     if (rawJson.empty()) {
@@ -202,17 +187,13 @@ std::vector<PackageVersion> OpenJdkPackageProvider::FetchAvailableVersions(HttpC
 }
 
 UrlString OpenJdkPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-#if defined(_WIN32)
-    return std::format("https://api.adoptium.net/v3/binary/version/{0}/windows/x64/jdk/hotspot/normal/eclipse", version);
-#elif defined(__APPLE__)
-    return std::format("https://api.adoptium.net/v3/binary/version/{0}/mac/x64/jdk/hotspot/normal/eclipse", version);
-#else
-    return std::format("https://api.adoptium.net/v3/binary/version/{0}/linux/x64/jdk/hotspot/normal/eclipse", version);
-#endif
+    std::string osQuery = (PlatformTraits::GetPlatformType() == PlatformType::Windows) ? "windows" :
+                          ((PlatformTraits::GetPlatformType() == PlatformType::macOS) ? "mac" : "linux");
+    return std::format("https://api.adoptium.net/v3/binary/version/{0}/{1}/x64/jdk/hotspot/normal/eclipse", version, osQuery);
 }
 
 std::string OpenJdkPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-    return std::format("openjdk-{}-x64.zip", version); // tar.gz on POSIX but zip wrapper matches Adoptium API response
+    return std::format("openjdk-{}-x64.zip", version);
 }
 
 // -----------------------------------------------------------------------------
@@ -228,11 +209,7 @@ PackageName GitPackageProvider::GetDisplayName() const {
 }
 
 bool GitPackageProvider::IsPlatformSupported() const {
-#if defined(_WIN32)
-    return true;
-#else
-    return false; // Linux has standard git via apt/yum/pacman
-#endif
+    return PlatformTraits::GetPlatformType() == PlatformType::Windows;
 }
 
 std::vector<PackageVersion> GitPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
@@ -281,11 +258,7 @@ PackageName VimPackageProvider::GetDisplayName() const {
 }
 
 bool VimPackageProvider::IsPlatformSupported() const {
-#if defined(_WIN32)
-    return true;
-#else
-    return false; // Unix systems have vim pre-installed or via standard system channels
-#endif
+    return PlatformTraits::GetPlatformType() == PlatformType::Windows;
 }
 
 std::vector<PackageVersion> VimPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
@@ -324,7 +297,6 @@ std::string VimPackageProvider::GetArchiveFilename(const PackageVersion& version
 std::vector<std::unique_ptr<PackageProvider>> PackageProviderRegistry::GetRegisteredProviders() {
     std::vector<std::unique_ptr<PackageProvider>> providers;
     
-    // Instantiate all potential providers
     auto nodejs = std::make_unique<NodeJsPackageProvider>();
     auto vscodium = std::make_unique<VSCodiumPackageProvider>();
     auto python = std::make_unique<PythonPackageProvider>();
@@ -332,7 +304,6 @@ std::vector<std::unique_ptr<PackageProvider>> PackageProviderRegistry::GetRegist
     auto git = std::make_unique<GitPackageProvider>();
     auto vim = std::make_unique<VimPackageProvider>();
 
-    // Check host compatibility before registering
     if (nodejs->IsPlatformSupported()) providers.push_back(std::move(nodejs));
     if (vscodium->IsPlatformSupported()) providers.push_back(std::move(vscodium));
     if (openjdk->IsPlatformSupported()) providers.push_back(std::move(openjdk));
