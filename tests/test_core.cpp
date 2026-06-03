@@ -82,4 +82,13 @@ TEST(ManifestManagerTest, SaveAndLoadCycle) {
     std::filesystem::remove_all(sandboxDir);
 }
 
+TEST(UtilsTest, WideStringConversions) {
+    std::string originalUtf8 = "Hello, CatUpdate package manager! 🐱";
+    std::wstring convertedWString = Utils::ToWString(originalUtf8);
+    ASSERT_FALSE(convertedWString.empty());
+
+    std::string roundTripUtf8 = Utils::ToString(convertedWString);
+    ASSERT_TRUE(originalUtf8 == roundTripUtf8);
+}
+
 } // namespace CatUpdate
