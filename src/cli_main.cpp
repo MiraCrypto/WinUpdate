@@ -50,6 +50,20 @@ int CommandLineInterface::Run(const std::vector<std::string>& arguments) {
             }
         }
         return ExecuteInstallCommand(packageId, versionOverride);
+    } else if (command == "download") {
+        if (arguments.size() < 3) {
+            std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << std::endl;
+            return 1;
+        }
+        std::string packageId = arguments[2];
+        std::string versionOverride;
+        for (size_t i = 3; i < arguments.size(); ++i) {
+            if (arguments[i] == "--version" && i + 1 < arguments.size()) {
+                versionOverride = arguments[i + 1];
+                break;
+            }
+        }
+        return ExecuteDownloadCommand(packageId, versionOverride);
     } else if (command == "uninstall") {
         if (arguments.size() < 3) {
             std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << std::endl;
@@ -75,6 +89,8 @@ void CommandLineInterface::PrintUsage() {
     std::cout << "  " << COLOR_GREEN << "info <package_id>" << COLOR_RESET << "         Show detailed package info and versions" << std::endl;
     std::cout << "  " << COLOR_GREEN << "install <package_id> [args]" << COLOR_RESET << " Install or update a package" << std::endl;
     std::cout << "      options: --version <ver>  Install specific version" << std::endl;
+    std::cout << "  " << COLOR_GREEN << "download <package_id> [args]" << COLOR_RESET << " Download package archive to current directory" << std::endl;
+    std::cout << "      options: --version <ver>  Download specific version" << std::endl;
     std::cout << "  " << COLOR_GREEN << "uninstall <package_id>" << COLOR_RESET << "   Remove an installed package" << std::endl;
     std::cout << "  " << COLOR_GREEN << "path [<new_path>]" << COLOR_RESET << "         Display or modify the root installation directory" << std::endl;
     std::cout << std::endl;
@@ -273,6 +289,65 @@ int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, co
 
     std::cout << COLOR_GREEN << "Installation of " << provider->GetDisplayName() << " completed successfully!" << COLOR_RESET << std::endl;
     std::cout << "Path: " << targetInstallationDir.string() << std::endl;
+    return 0;
+}
+
+int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, const std::string& versionOverride) {
+    auto providers = PackageProviderRegistry::GetRegisteredProviders();
+    auto providerIt = std::find_if(providers.begin(), providers.end(), [&](const auto& p) {
+        return p->GetIdentifier() == packageId;
+    });
+
+    if (providerIt == providers.end()) {
+        std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported or available." << COLOR_RESET << std::endl;
+        return 1;
+    }
+
+    auto provider = providerIt->get();
+    auto httpClient = HttpClientFactory::CreateDefaultClient();
+
+    std::string targetVersion = versionOverride;
+    if (targetVersion.empty()) {
+        std::cout << COLOR_CYAN << "Retrieving latest version for " << provider->GetDisplayName() << "..." << COLOR_RESET << std::endl;
+        auto versions = provider->FetchAvailableVersions(*httpClient);
+        if (versions.empty()) {
+            std::cerr << COLOR_RED << "Error: Failed to query remote version registry." << COLOR_RESET << std::endl;
+            return 1;
+        }
+        targetVersion = versions[0];
+    }
+
+    UrlString downloadUrl = provider->GetDownloadUrl(targetVersion);
+    std::string archiveName = provider->GetArchiveFilename(targetVersion);
+    std::filesystem::path targetFile = std::filesystem::current_path() / archiveName;
+
+    std::cout << COLOR_CYAN << std::format("Downloading {} (Version: {}) to current directory", provider->GetDisplayName(), targetVersion) << COLOR_RESET << std::endl;
+    std::cout << "Destination:  " << targetFile.string() << std::endl;
+    std::cout << "Download URL: " << downloadUrl << std::endl;
+
+    // Download File
+    bool downloadSuccess = httpClient->DownloadFile(downloadUrl, targetFile, [](float progress) {
+        int barWidth = 40;
+        std::cout << "\r[";
+        int pos = static_cast<int>(barWidth * progress);
+        for (int i = 0; i < barWidth; ++i) {
+            if (i < pos) std::cout << "=";
+            else if (i == pos) std::cout << ">";
+            else std::cout << " ";
+        }
+        std::cout << "] " << static_cast<int>(progress * 100.0) << " %" << std::flush;
+    });
+    std::cout << std::endl;
+
+    if (!downloadSuccess) {
+        std::cerr << COLOR_RED << "Error: Download failed." << COLOR_RESET << std::endl;
+        if (std::filesystem::exists(targetFile)) {
+            std::filesystem::remove(targetFile);
+        }
+        return 1;
+    }
+
+    std::cout << COLOR_GREEN << "Download completed successfully!" << COLOR_RESET << std::endl;
     return 0;
 }
 
