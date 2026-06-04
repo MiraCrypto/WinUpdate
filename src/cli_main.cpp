@@ -428,7 +428,7 @@ int wmain(int argc, wchar_t* argv[]) noexcept {
     std::vector<std::string> args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {
-      args.push_back(CatUpdate::Utils::ToString(argv[i])); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      args.push_back(CatUpdate::Utils::ToString(argv[i]));
     }
     return CatUpdate::CommandLineInterface::Run(args);
   } catch (const std::exception& ex) {
@@ -445,7 +445,7 @@ int main(int argc, char* argv[]) noexcept {
     std::vector<std::string> args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {
-      args.emplace_back(argv[i]); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      args.emplace_back(argv[i]);
     }
     return CatUpdate::CommandLineInterface::Run(args);
   } catch (const std::exception& ex) {
