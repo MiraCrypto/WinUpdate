@@ -21,16 +21,14 @@ public:
    *                            and subsequent elements are the arguments.
    * @return ProcessExecutionResult containing the exit code and console outputs.
    */
-  static std::optional<ProcessExecutionResult>
-  ExecuteCommand(const std::vector<std::string>& commandAndArguments);
+  static std::optional<ProcessExecutionResult> ExecuteCommand(const std::vector<std::string>& commandAndArguments);
 
   /**
    * A helper that runs a single command-line string directly using system shell conventions.
    * On Windows: Run via cmd.exe or directly.
    * On POSIX: Run via /bin/sh.
    */
-  static std::optional<ProcessExecutionResult>
-  ExecuteShellCommand(const std::string& shellCommandLine);
+  static std::optional<ProcessExecutionResult> ExecuteShellCommand(const std::string& shellCommandLine);
 };
 
 } // namespace CatUpdate

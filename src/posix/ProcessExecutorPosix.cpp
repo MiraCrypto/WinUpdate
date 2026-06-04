@@ -2,8 +2,12 @@
 #include "ProcessExecutor.hpp"
 #include <array>
 #include <cstdio>
+#include <cstdlib>
+#include <optional>
+#include <string>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 
 namespace CatUpdate {
@@ -21,7 +25,7 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
     return std::nullopt;
   }
 
-  const pid_t pid = fork();
+  const pid_t pid = fork(); // NOLINT(misc-include-cleaner)
   if (pid == -1) {
     close(stdoutPipe[0]);
     close(stdoutPipe[1]);
@@ -62,7 +66,7 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
   std::string standardOutput;
   while (true) {
     std::array<char, 1024> buffer{};
-    const ssize_t bytesRead = read(stdoutPipe[0], buffer.data(), buffer.size() - 1);
+    const ssize_t bytesRead = read(stdoutPipe[0], buffer.data(), buffer.size() - 1); // NOLINT(misc-include-cleaner)
     if (bytesRead <= 0) {
       break;
     }
@@ -91,7 +95,7 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
 std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
   // Append 2>&1 to shell command to merge stderr into stdout
   const std::string commandWithRedirect = shellCommandLine + " 2>&1";
-  FILE* fileStream = popen(commandWithRedirect.c_str(), "r"); // NOLINT(bugprone-command-processor)
+  FILE* fileStream = popen(commandWithRedirect.c_str(), "r"); // NOLINT(bugprone-command-processor,misc-include-cleaner)
   if (fileStream == nullptr) {
     return std::nullopt;
   }
@@ -102,7 +106,7 @@ std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteShellCommand(const
     standardOutput.append(buffer.data());
   }
 
-  int status = pclose(fileStream);
+  int status = pclose(fileStream); // NOLINT(misc-include-cleaner)
   int exitCode = 0;
   if (WIFEXITED(status)) {
     exitCode = WEXITSTATUS(status);

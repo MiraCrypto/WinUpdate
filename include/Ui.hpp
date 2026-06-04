@@ -33,8 +33,8 @@ public:
 private:
   // Window Procedure Callbacks
   static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
-  static LRESULT CALLBACK CustomButtonProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
-                                           UINT_PTR subclassId, DWORD_PTR refData);
+  static LRESULT CALLBACK CustomButtonProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, UINT_PTR subclassId,
+                                           DWORD_PTR refData);
 
   // Initialization routines
   static void CreateControls(HWND parentWindow);
@@ -52,8 +52,7 @@ private:
   // Painting & Demoscene animations
   static void PaintDemosceneScreen(HWND hwnd, HDC hdc);
   static void UpdateDemosceneAnimation(HWND hwnd);
-  static void DrawGlowingText(HDC hdc, const std::wstring& text, int x, int y, COLORREF color,
-                              int fontSize);
+  static void DrawGlowingText(HDC hdc, const std::wstring& text, int x, int y, COLORREF color, int fontSize);
 
   // Core State
   inline static HINSTANCE m_hinstance = nullptr;

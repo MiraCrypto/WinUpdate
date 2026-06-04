@@ -1,4 +1,5 @@
 #include "test_helper.hpp"
+#include <exception>
 #include <iostream>
 
 // ANSI Terminal Colors for test suite
@@ -18,12 +19,9 @@ int main() noexcept {
     int passedCount = 0;
     int failedCount = 0;
 
-    std::cout << TEST_COLOR_CYAN
-              << "====================================================" << TEST_COLOR_RESET << '\n';
-    std::cout << TEST_COLOR_BOLD << "              CatUpdate Unit Test Suite" << TEST_COLOR_RESET
-              << '\n';
-    std::cout << TEST_COLOR_CYAN
-              << "====================================================" << TEST_COLOR_RESET << '\n'
+    std::cout << TEST_COLOR_CYAN << "====================================================" << TEST_COLOR_RESET << '\n';
+    std::cout << TEST_COLOR_BOLD << "              CatUpdate Unit Test Suite" << TEST_COLOR_RESET << '\n';
+    std::cout << TEST_COLOR_CYAN << "====================================================" << TEST_COLOR_RESET << '\n'
               << '\n';
 
     for (const auto& testCase : testCases) {
@@ -31,29 +29,27 @@ int main() noexcept {
 
       try {
         testCase.testFunction();
-        std::cout << TEST_COLOR_GREEN << "[       OK ] " << TEST_COLOR_RESET << testCase.suiteName
-                  << "." << testCase.testName << '\n';
+        std::cout << TEST_COLOR_GREEN << "[       OK ] " << TEST_COLOR_RESET << testCase.suiteName << "."
+                  << testCase.testName << '\n';
         passedCount++;
       } catch (const std::exception& ex) {
-        std::cout << TEST_COLOR_RED << "[  FAILED  ] " << TEST_COLOR_RESET << testCase.suiteName
-                  << "." << testCase.testName << " (Reason: " << ex.what() << ")" << '\n';
+        std::cout << TEST_COLOR_RED << "[  FAILED  ] " << TEST_COLOR_RESET << testCase.suiteName << "."
+                  << testCase.testName << " (Reason: " << ex.what() << ")" << '\n';
         failedCount++;
       } catch (...) {
-        std::cout << TEST_COLOR_RED << "[  FAILED  ] " << TEST_COLOR_RESET << testCase.suiteName
-                  << "." << testCase.testName << " (Reason: Unknown exception occurred)" << '\n';
+        std::cout << TEST_COLOR_RED << "[  FAILED  ] " << TEST_COLOR_RESET << testCase.suiteName << "."
+                  << testCase.testName << " (Reason: Unknown exception occurred)" << '\n';
         failedCount++;
       }
     }
 
     std::cout << '\n';
-    std::cout << TEST_COLOR_CYAN
-              << "====================================================" << TEST_COLOR_RESET << '\n';
+    std::cout << TEST_COLOR_CYAN << "====================================================" << TEST_COLOR_RESET << '\n';
     std::cout << TEST_COLOR_BOLD << "Test Summary:" << TEST_COLOR_RESET << '\n';
     std::cout << "  Total:  " << testCases.size() << '\n';
     std::cout << "  " << TEST_COLOR_GREEN << "Passed: " << TEST_COLOR_RESET << passedCount << '\n';
     std::cout << "  " << TEST_COLOR_RED << "Failed: " << TEST_COLOR_RESET << failedCount << '\n';
-    std::cout << TEST_COLOR_CYAN
-              << "====================================================" << TEST_COLOR_RESET << '\n';
+    std::cout << TEST_COLOR_CYAN << "====================================================" << TEST_COLOR_RESET << '\n';
 
     return (failedCount == 0) ? 0 : 1;
   } catch (const std::exception& ex) {

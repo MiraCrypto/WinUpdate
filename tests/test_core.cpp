@@ -1,7 +1,7 @@
 #include "CatUpdateCore.hpp"
 #include "test_helper.hpp"
 #include <filesystem>
-#include <fstream>
+#include <string>
 
 namespace CatUpdate {
 
@@ -17,8 +17,7 @@ TEST(PathResolverTest, DefaultInstallPathResolution) {
 #ifdef _WIN32
   // Public Documents typically contains "Public" or "Documents"
   std::string pathStr = rootPath.string();
-  ASSERT_TRUE(pathStr.find("Public") != std::string::npos ||
-              pathStr.find("Documents") != std::string::npos);
+  ASSERT_TRUE(pathStr.find("Public") != std::string::npos || pathStr.find("Documents") != std::string::npos);
 #else
   // ~/.local
   ASSERT_TRUE(rootPath.filename() == ".local");

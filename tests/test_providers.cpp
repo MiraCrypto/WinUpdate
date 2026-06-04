@@ -1,6 +1,6 @@
 #include "Providers.hpp"
 #include "test_helper.hpp"
-#include <algorithm>
+#include <string>
 
 namespace CatUpdate {
 

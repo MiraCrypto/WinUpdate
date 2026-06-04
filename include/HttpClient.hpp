@@ -21,8 +21,7 @@ public:
    * Downloads a file synchronously from a given URL and writes it to the destination path.
    * Invokes the optional progress callback during the download loop.
    */
-  virtual bool DownloadFile(const UrlString& sourceUrl,
-                            const std::filesystem::path& destinationFilePath,
+  virtual bool DownloadFile(const UrlString& sourceUrl, const std::filesystem::path& destinationFilePath,
                             const DownloadProgressCallback& progressCallback = nullptr) = 0;
 
   /**

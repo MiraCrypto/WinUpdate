@@ -1,8 +1,15 @@
 #include "Providers.hpp"
+#include "CatUpdateCore.hpp"
+#include "HttpClient.hpp"
 #include "PlatformTraits.hpp"
 #include "json.hpp"
-#include <algorithm>
+#include <cstddef>
+#include <exception>
 #include <format>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace CatUpdate {
 

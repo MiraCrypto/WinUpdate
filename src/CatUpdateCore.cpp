@@ -1,11 +1,13 @@
 #include "CatUpdateCore.hpp"
 #include "json.hpp"
-#include <algorithm>
-#include <chrono>
-#include <format>
+#include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace CatUpdate {
 

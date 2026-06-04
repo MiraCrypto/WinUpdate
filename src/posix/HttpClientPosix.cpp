@@ -1,5 +1,9 @@
 #include "HttpClient.hpp"
+#include "CatUpdateCore.hpp"
 #include "ProcessExecutor.hpp"
+#include <filesystem>
+#include <memory>
+#include <string>
 #include <vector>
 
 namespace CatUpdate {

@@ -16,10 +16,8 @@ private:
   static void PrintUsage();
   static int ExecuteListCommand();
   static int ExecuteInfoCommand(const std::string& packageId);
-  static int ExecuteInstallCommand(const std::string& packageId,
-                                   const std::string& versionOverride);
-  static int ExecuteDownloadCommand(const std::string& packageId,
-                                    const std::string& versionOverride);
+  static int ExecuteInstallCommand(const std::string& packageId, const std::string& versionOverride);
+  static int ExecuteDownloadCommand(const std::string& packageId, const std::string& versionOverride);
   static int ExecuteUninstallCommand(const std::string& packageId);
   static int ExecutePathCommand(const std::vector<std::string>& pathArguments);
 };
