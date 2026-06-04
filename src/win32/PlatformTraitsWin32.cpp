@@ -2,10 +2,16 @@
 
 namespace CatUpdate {
 
-PlatformType PlatformTraits::GetPlatformType() { return PlatformType::Windows; }
+PlatformType PlatformTraits::GetPlatformType() {
+  return PlatformType::Windows;
+}
 
-std::string PlatformTraits::GetPlatformNameString() { return "win-x64"; }
+std::string PlatformTraits::GetPlatformNameString() {
+  return "win-x64";
+}
 
-std::string PlatformTraits::GetArchiveExtension() { return ".zip"; }
+std::string PlatformTraits::GetArchiveExtension() {
+  return ".zip";
+}
 
 } // namespace CatUpdate

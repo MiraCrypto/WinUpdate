@@ -26,29 +26,25 @@ public:
     }
 
     std::wstring hostName(urlComponents.lpszHostName, urlComponents.dwHostNameLength);
-    std::wstring urlPath(urlComponents.lpszUrlPath,
-                         urlComponents.dwUrlPathLength + urlComponents.dwExtraInfoLength);
+    std::wstring urlPath(urlComponents.lpszUrlPath, urlComponents.dwUrlPathLength + urlComponents.dwExtraInfoLength);
 
-    HINTERNET sessionHandle = WinHttpOpen(L"CatUpdate/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                                          WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    HINTERNET sessionHandle = WinHttpOpen(L"CatUpdate/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
+                                          WINHTTP_NO_PROXY_BYPASS, 0);
     if (!sessionHandle) {
       SystemLogger::LogError("WinHttpOpen failed.");
       return false;
     }
 
-    HINTERNET connectionHandle =
-        WinHttpConnect(sessionHandle, hostName.c_str(), urlComponents.nPort, 0);
+    HINTERNET connectionHandle = WinHttpConnect(sessionHandle, hostName.c_str(), urlComponents.nPort, 0);
     if (!connectionHandle) {
       WinHttpCloseHandle(sessionHandle);
       SystemLogger::LogError("WinHttpConnect failed.");
       return false;
     }
 
-    DWORD securityFlags =
-        (urlComponents.nPort == INTERNET_DEFAULT_HTTPS_PORT) ? WINHTTP_FLAG_SECURE : 0;
-    HINTERNET requestHandle =
-        WinHttpOpenRequest(connectionHandle, L"GET", urlPath.c_str(), NULL, WINHTTP_NO_REFERER,
-                           WINHTTP_DEFAULT_ACCEPT_TYPES, securityFlags);
+    DWORD securityFlags = (urlComponents.nPort == INTERNET_DEFAULT_HTTPS_PORT) ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET requestHandle = WinHttpOpenRequest(connectionHandle, L"GET", urlPath.c_str(), NULL, WINHTTP_NO_REFERER,
+                                                 WINHTTP_DEFAULT_ACCEPT_TYPES, securityFlags);
     if (!requestHandle) {
       WinHttpCloseHandle(connectionHandle);
       WinHttpCloseHandle(sessionHandle);
@@ -57,8 +53,7 @@ public:
     }
 
     // Send the request
-    BOOL result = WinHttpSendRequest(requestHandle, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                                     WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
+    BOOL result = WinHttpSendRequest(requestHandle, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
     if (!result) {
       WinHttpCloseHandle(requestHandle);
       WinHttpCloseHandle(connectionHandle);
@@ -81,8 +76,7 @@ public:
     DWORD contentSize = 0;
     DWORD headerLength = sizeof(contentSize);
     WinHttpQueryHeaders(requestHandle, WINHTTP_QUERY_CONTENT_LENGTH | WINHTTP_QUERY_FLAG_NUMBER,
-                        WINHTTP_HEADER_NAME_BY_INDEX, &contentSize, &headerLength,
-                        WINHTTP_NO_HEADER_INDEX);
+                        WINHTTP_HEADER_NAME_BY_INDEX, &contentSize, &headerLength, WINHTTP_NO_HEADER_INDEX);
 
     // Open destination file
     std::ofstream outputFile(destinationFilePath, std::ios::binary);
@@ -108,14 +102,12 @@ public:
       }
 
       std::vector<char> buffer(dataAvailable);
-      if (WinHttpReadData(requestHandle, static_cast<LPVOID>(buffer.data()), dataAvailable,
-                          &bytesDownloaded)) {
+      if (WinHttpReadData(requestHandle, static_cast<LPVOID>(buffer.data()), dataAvailable, &bytesDownloaded)) {
         outputFile.write(buffer.data(), bytesDownloaded);
         totalBytesDownloaded += bytesDownloaded;
 
         if (contentSize > 0 && progressCallback) {
-          float progressPercentage =
-              static_cast<float>(totalBytesDownloaded) / static_cast<float>(contentSize);
+          float progressPercentage = static_cast<float>(totalBytesDownloaded) / static_cast<float>(contentSize);
           progressCallback(progressPercentage);
         }
       }
@@ -141,27 +133,23 @@ public:
     }
 
     std::wstring hostName(urlComponents.lpszHostName, urlComponents.dwHostNameLength);
-    std::wstring urlPath(urlComponents.lpszUrlPath,
-                         urlComponents.dwUrlPathLength + urlComponents.dwExtraInfoLength);
+    std::wstring urlPath(urlComponents.lpszUrlPath, urlComponents.dwUrlPathLength + urlComponents.dwExtraInfoLength);
 
-    HINTERNET sessionHandle = WinHttpOpen(L"CatUpdate/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                                          WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    HINTERNET sessionHandle = WinHttpOpen(L"CatUpdate/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
+                                          WINHTTP_NO_PROXY_BYPASS, 0);
     if (!sessionHandle) {
       return "";
     }
 
-    HINTERNET connectionHandle =
-        WinHttpConnect(sessionHandle, hostName.c_str(), urlComponents.nPort, 0);
+    HINTERNET connectionHandle = WinHttpConnect(sessionHandle, hostName.c_str(), urlComponents.nPort, 0);
     if (!connectionHandle) {
       WinHttpCloseHandle(sessionHandle);
       return "";
     }
 
-    DWORD securityFlags =
-        (urlComponents.nPort == INTERNET_DEFAULT_HTTPS_PORT) ? WINHTTP_FLAG_SECURE : 0;
-    HINTERNET requestHandle =
-        WinHttpOpenRequest(connectionHandle, L"GET", urlPath.c_str(), NULL, WINHTTP_NO_REFERER,
-                           WINHTTP_DEFAULT_ACCEPT_TYPES, securityFlags);
+    DWORD securityFlags = (urlComponents.nPort == INTERNET_DEFAULT_HTTPS_PORT) ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET requestHandle = WinHttpOpenRequest(connectionHandle, L"GET", urlPath.c_str(), NULL, WINHTTP_NO_REFERER,
+                                                 WINHTTP_DEFAULT_ACCEPT_TYPES, securityFlags);
     if (!requestHandle) {
       WinHttpCloseHandle(connectionHandle);
       WinHttpCloseHandle(sessionHandle);
@@ -173,8 +161,7 @@ public:
     WinHttpAddRequestHeaders(requestHandle, headers.c_str(), static_cast<DWORD>(-1),
                              WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE);
 
-    BOOL result = WinHttpSendRequest(requestHandle, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                                     WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
+    BOOL result = WinHttpSendRequest(requestHandle, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
     if (result) {
       result = WinHttpReceiveResponse(requestHandle, NULL);
     }
@@ -188,8 +175,7 @@ public:
           break;
         }
         std::vector<char> buffer(dataAvailable);
-        if (WinHttpReadData(requestHandle, static_cast<LPVOID>(buffer.data()), dataAvailable,
-                            &bytesDownloaded)) {
+        if (WinHttpReadData(requestHandle, static_cast<LPVOID>(buffer.data()), dataAvailable, &bytesDownloaded)) {
           responseString.append(buffer.data(), bytesDownloaded);
         }
       } while (dataAvailable > 0);

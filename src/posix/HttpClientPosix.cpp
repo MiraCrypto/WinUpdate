@@ -4,33 +4,30 @@
 
 namespace CatUpdate {
 
+namespace {
 class PosixCurlHttpClient : public HttpClient {
 public:
   bool DownloadFile(const UrlString& sourceUrl, const std::filesystem::path& destinationFilePath,
                     const DownloadProgressCallback& progressCallback) override {
     SystemLogger::LogInformation("Downloading " + sourceUrl + " via curl...");
 
-    std::vector<std::string> command = {"curl",   "-L", "-s", "-o", destinationFilePath.string(),
-                                        sourceUrl};
-
-    constexpr float STARTUP_PROGRESS_FRACTION = 0.1F;
-    constexpr float COMPLETED_PROGRESS_FRACTION = 1.0F;
+    const std::vector<std::string> command = {"curl", "-L", "-s", "-o", destinationFilePath.string(), sourceUrl};
 
     if (progressCallback) {
-      progressCallback(STARTUP_PROGRESS_FRACTION); // Simulate startup
+      progressCallback(0.1F); // Simulate startup
     }
 
     auto executionResult = ProcessExecutor::ExecuteCommand(command);
 
     if (progressCallback && executionResult && executionResult->exitCode == 0) {
-      progressCallback(COMPLETED_PROGRESS_FRACTION); // Finished
+      progressCallback(1.0F); // Finished
     }
 
     return executionResult.has_value() && executionResult->exitCode == 0;
   }
 
   std::string FetchStringContent(const UrlString& sourceUrl) override {
-    std::vector<std::string> command = {"curl", "-L", "-s", "-A", "CatUpdate/1.0", sourceUrl};
+    const std::vector<std::string> command = {"curl", "-L", "-s", "-A", "CatUpdate/1.0", sourceUrl};
 
     auto executionResult = ProcessExecutor::ExecuteCommand(command);
     if (executionResult && executionResult->exitCode == 0) {
@@ -40,6 +37,7 @@ public:
     return "";
   }
 };
+} // namespace
 
 std::unique_ptr<HttpClient> HttpClientFactory::CreateDefaultClient() {
   return std::make_unique<PosixCurlHttpClient>();

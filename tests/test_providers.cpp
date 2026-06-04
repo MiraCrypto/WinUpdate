@@ -26,13 +26,13 @@ TEST(ProvidersTest, RegistryInitialization) {
 
 TEST(ProvidersTest, PlatformSupportFiltering) {
   // NodeJs should always be supported
-  NodeJsPackageProvider nodeProvider;
+  const NodeJsPackageProvider nodeProvider;
   ASSERT_TRUE(nodeProvider.IsPlatformSupported());
 
 #ifndef _WIN32
   // Git and Python embeddable should NOT be supported on Linux/macOS
-  GitPackageProvider gitProvider;
-  PythonPackageProvider pythonProvider;
+  const GitPackageProvider gitProvider;
+  const PythonPackageProvider pythonProvider;
 
   ASSERT_FALSE(gitProvider.IsPlatformSupported());
   ASSERT_FALSE(pythonProvider.IsPlatformSupported());
@@ -40,8 +40,8 @@ TEST(ProvidersTest, PlatformSupportFiltering) {
 }
 
 TEST(ProvidersTest, DownloadFilenameFormatting) {
-  NodeJsPackageProvider nodeProvider;
-  std::string filename = nodeProvider.GetArchiveFilename("20.11.1");
+  const NodeJsPackageProvider nodeProvider;
+  const std::string filename = nodeProvider.GetArchiveFilename("20.11.1");
 
   ASSERT_FALSE(filename.empty());
 

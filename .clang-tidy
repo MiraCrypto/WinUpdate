@@ -6,11 +6,29 @@ Checks: >
   modernize-*,
   performance-*,
   readability-*,
+  misc-*,
   -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
-  -modernize-use-trailing-return-type
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers
 
-WarningsAsErrors: '*'
-HeaderFilterRegex: 'src/.*'
+WarningsAsErrors: "*"
+HeaderFilterRegex: "^src/.*"
+
+CheckOptions:
+  # Enforce strict standard constraints, upgrading older C++ constructs
+  - key:             modernize-loop-convert.MinConfidence
+    value:           reasonable
+  - key:             readability-identifier-naming.ClassCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.VariableCase
+    value:           camelBack
+  - key:             readability-identifier-naming.GlobalConstantCase
+    value:           UPPER_CASE
+  - key:             readability-identifier-naming.FunctionCase
+    value:           CamelCase
 ...

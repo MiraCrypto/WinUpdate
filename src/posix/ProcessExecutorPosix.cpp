@@ -53,17 +53,15 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
     execvp(cArgs[0], cArgs.data());
 
     // If exec fails, terminate immediately
-    constexpr int EXEC_FAILURE_EXIT_CODE = 127;
-    exit(EXEC_FAILURE_EXIT_CODE);
+    exit(127);
   }
 
   // Parent process
   close(stdoutPipe[1]);
 
   std::string standardOutput;
-  constexpr size_t BUFFER_SIZE = 1024;
   while (true) {
-    std::array<char, BUFFER_SIZE> buffer{};
+    std::array<char, 1024> buffer{};
     const ssize_t bytesRead = read(stdoutPipe[0], buffer.data(), buffer.size() - 1);
     if (bytesRead <= 0) {
       break;
@@ -90,18 +88,16 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
   return result;
 }
 
-std::optional<ProcessExecutionResult>
-ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
+std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
   // Append 2>&1 to shell command to merge stderr into stdout
-  std::string commandWithRedirect = shellCommandLine + " 2>&1";
+  const std::string commandWithRedirect = shellCommandLine + " 2>&1";
   FILE* fileStream = popen(commandWithRedirect.c_str(), "r"); // NOLINT(bugprone-command-processor)
   if (fileStream == nullptr) {
     return std::nullopt;
   }
 
   std::string standardOutput;
-  constexpr size_t SHELL_BUFFER_SIZE = 1024;
-  std::array<char, SHELL_BUFFER_SIZE> buffer{};
+  std::array<char, 1024> buffer{};
   while (fgets(buffer.data(), static_cast<int>(buffer.size()), fileStream) != nullptr) {
     standardOutput.append(buffer.data());
   }

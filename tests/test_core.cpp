@@ -27,11 +27,11 @@ TEST(PathResolverTest, DefaultInstallPathResolution) {
 
 TEST(ManifestManagerTest, SaveAndLoadCycle) {
   // Create localized temporary sandbox inside workspace for deterministic testing
-  std::filesystem::path sandboxDir = std::filesystem::current_path() / "test_sandbox";
+  const std::filesystem::path sandboxDir = std::filesystem::current_path() / "test_sandbox";
   std::filesystem::create_directories(sandboxDir);
 
   // Cleanup sandbox from previous runs if any
-  std::filesystem::path manifestFilePath = sandboxDir / "catupdate.json";
+  const std::filesystem::path manifestFilePath = sandboxDir / "catupdate.json";
   if (std::filesystem::exists(manifestFilePath)) {
     std::filesystem::remove(manifestFilePath);
   }
@@ -57,7 +57,7 @@ TEST(ManifestManagerTest, SaveAndLoadCycle) {
 
   // Test restoration in a new ManifestManager instance (verifying serialization)
   {
-    ManifestManager manager(sandboxDir);
+    const ManifestManager manager(sandboxDir);
     ASSERT_TRUE(manager.IsPackageInstalled("nodejs"));
 
     auto query = manager.GetInstalledPackageByIdentifier("nodejs");
@@ -75,7 +75,7 @@ TEST(ManifestManagerTest, SaveAndLoadCycle) {
 
   // Verify file persistence of unregistration
   {
-    ManifestManager manager(sandboxDir);
+    const ManifestManager manager(sandboxDir);
     ASSERT_FALSE(manager.IsPackageInstalled("nodejs"));
   }
 
@@ -84,11 +84,11 @@ TEST(ManifestManagerTest, SaveAndLoadCycle) {
 }
 
 TEST(UtilsTest, WideStringConversions) {
-  std::string originalUtf8 = "Hello, CatUpdate package manager! 🐱";
-  std::wstring convertedWString = Utils::ToWString(originalUtf8);
+  const std::string originalUtf8 = "Hello, CatUpdate package manager! 🐱";
+  const std::wstring convertedWString = Utils::ToWString(originalUtf8);
   ASSERT_FALSE(convertedWString.empty());
 
-  std::string roundTripUtf8 = Utils::ToString(convertedWString);
+  const std::string roundTripUtf8 = Utils::ToString(convertedWString);
   ASSERT_TRUE(originalUtf8 == roundTripUtf8);
 }
 

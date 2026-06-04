@@ -1,8 +1,13 @@
 #ifdef _WIN32
 
-#define WIN32_LEAN_AND_MEAN
+#define _WIN32_WINNT 0x0A00
+#define _WIN32_IE 0x0700
 #include <windows.h>
+#include <winerror.h>
+
 #include <commctrl.h>
+#include <objbase.h>
+#include <shlobj.h>
 
 #include "HttpClient.hpp"
 #include "ProcessExecutor.hpp"
@@ -11,8 +16,6 @@
 #include <chrono>
 #include <cmath>
 #include <iomanip>
-#include <objbase.h>
-#include <shlobj.h>
 #include <sstream>
 #include <thread>
 
@@ -50,10 +53,9 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   }
 
   // Create the Main Window
-  m_mainWindow = CreateWindowExW(
-      WS_EX_APPWINDOW, L"CatUpdateMainWindowClass", L"CatUpdate - No-Admin Software Center",
-      WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 800,
-      650, nullptr, nullptr, hinstance, nullptr);
+  m_mainWindow = CreateWindowExW(WS_EX_APPWINDOW, L"CatUpdateMainWindowClass", L"CatUpdate - No-Admin Software Center",
+                                 WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT,
+                                 800, 650, nullptr, nullptr, hinstance, nullptr);
 
   if (!m_mainWindow) {
     SystemLogger::LogError("Failed to create main Win32 window.");
@@ -117,9 +119,9 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
   HFONT defaultSystemFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 
   // Software Packages ListView (Grid view of applications)
-  m_packageListView = CreateWindowExW(
-      0, WC_LISTVIEW, L"", WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SINGLESEL, 20, 70,
-      745, 250, parentWindow, reinterpret_cast<HMENU>(2001), m_hinstance, nullptr);
+  m_packageListView =
+      CreateWindowExW(0, WC_LISTVIEW, L"", WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_SINGLESEL, 20, 70, 745,
+                      250, parentWindow, reinterpret_cast<HMENU>(2001), m_hinstance, nullptr);
   ListView_SetExtendedListViewStyle(m_packageListView, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
   SendMessage(m_packageListView, WM_SETFONT, reinterpret_cast<WPARAM>(defaultSystemFont), TRUE);
 
@@ -148,44 +150,38 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
   ListView_InsertColumn(m_packageListView, 2, &packageStatusColumn);
 
   // Available versions dropdown ComboBox
-  m_versionComboBox =
-      CreateWindowExW(0, WC_COMBOBOX, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST, 20, 335, 200,
-                      200, parentWindow, reinterpret_cast<HMENU>(2002), m_hinstance, nullptr);
+  m_versionComboBox = CreateWindowExW(0, WC_COMBOBOX, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST, 20, 335, 200, 200,
+                                      parentWindow, reinterpret_cast<HMENU>(2002), m_hinstance, nullptr);
   SendMessage(m_versionComboBox, WM_SETFONT, reinterpret_cast<WPARAM>(defaultSystemFont), TRUE);
 
   // Custom Cyberpunk Styled Buttons
-  m_installButton = CreateWindowExW(
-      0, WC_BUTTON, L"INSTALL / UPDATE", WS_CHILD | WS_VISIBLE | WS_DISABLED, 235, 335, 180, 30,
-      parentWindow, reinterpret_cast<HMENU>(2003), m_hinstance, nullptr);
+  m_installButton = CreateWindowExW(0, WC_BUTTON, L"INSTALL / UPDATE", WS_CHILD | WS_VISIBLE | WS_DISABLED, 235, 335,
+                                    180, 30, parentWindow, reinterpret_cast<HMENU>(2003), m_hinstance, nullptr);
   SetWindowSubclass(m_installButton, CustomButtonProc, 1, 0);
 
-  m_changePathButton =
-      CreateWindowExW(0, WC_BUTTON, L"CHANGE PATH", WS_CHILD | WS_VISIBLE, 430, 335, 150, 30,
-                      parentWindow, reinterpret_cast<HMENU>(2004), m_hinstance, nullptr);
+  m_changePathButton = CreateWindowExW(0, WC_BUTTON, L"CHANGE PATH", WS_CHILD | WS_VISIBLE, 430, 335, 150, 30,
+                                       parentWindow, reinterpret_cast<HMENU>(2004), m_hinstance, nullptr);
   SetWindowSubclass(m_changePathButton, CustomButtonProc, 2, 0);
 
-  m_uninstallButton =
-      CreateWindowExW(0, WC_BUTTON, L"UNINSTALL", WS_CHILD | WS_VISIBLE | WS_DISABLED, 595, 335,
-                      170, 30, parentWindow, reinterpret_cast<HMENU>(2005), m_hinstance, nullptr);
+  m_uninstallButton = CreateWindowExW(0, WC_BUTTON, L"UNINSTALL", WS_CHILD | WS_VISIBLE | WS_DISABLED, 595, 335, 170,
+                                      30, parentWindow, reinterpret_cast<HMENU>(2005), m_hinstance, nullptr);
   SetWindowSubclass(m_uninstallButton, CustomButtonProc, 3, 0);
 
   // Installation Path Display label
-  m_pathDisplayEdit =
-      CreateWindowExW(0, WC_EDIT, L"Installation Path: ",
-                      WS_CHILD | WS_VISIBLE | ES_LEFT | ES_READONLY | ES_AUTOHSCROLL | WS_BORDER,
-                      20, 375, 745, 24, parentWindow, nullptr, m_hinstance, nullptr);
+  m_pathDisplayEdit = CreateWindowExW(0, WC_EDIT, L"Installation Path: ",
+                                      WS_CHILD | WS_VISIBLE | ES_LEFT | ES_READONLY | ES_AUTOHSCROLL | WS_BORDER, 20,
+                                      375, 745, 24, parentWindow, nullptr, m_hinstance, nullptr);
   SendMessage(m_pathDisplayEdit, WM_SETFONT, reinterpret_cast<WPARAM>(defaultSystemFont), TRUE);
 
   // Hacker Terminal Console Log
   m_consoleLogEdit = CreateWindowExW(
-      0, WC_EDIT, L"",
-      WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
-      20, 405, 745, 110, parentWindow, nullptr, m_hinstance, nullptr);
+      0, WC_EDIT, L"", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL, 20,
+      405, 745, 110, parentWindow, nullptr, m_hinstance, nullptr);
 
   // Status Static label
-  m_statusStatusBar = CreateWindowExW(0, WC_STATIC, L"Select a package to begin...",
-                                      WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX, 20, 520, 745,
-                                      20, parentWindow, nullptr, m_hinstance, nullptr);
+  m_statusStatusBar =
+      CreateWindowExW(0, WC_STATIC, L"Select a package to begin...", WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX, 20,
+                      520, 745, 20, parentWindow, nullptr, m_hinstance, nullptr);
   SendMessage(m_statusStatusBar, WM_SETFONT, reinterpret_cast<WPARAM>(defaultSystemFont), TRUE);
 }
 
@@ -216,13 +212,11 @@ void DesktopUserInterface::InitializeDemosceneAssets(HWND parentWindow) {
   }
 
   // Create GDI Fonts for beautiful hacker themed text rendering
-  m_demosceneFont =
-      CreateFontW(26, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
-                  CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, VARIABLE_PITCH, L"Consolas");
+  m_demosceneFont = CreateFontW(26, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+                                CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, VARIABLE_PITCH, L"Consolas");
 
-  m_scrollerFont = CreateFontW(20, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-                               OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
-                               FIXED_PITCH, L"Courier New");
+  m_scrollerFont = CreateFontW(20, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+                               CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, FIXED_PITCH, L"Courier New");
 }
 
 // -----------------------------------------------------------------------------
@@ -279,8 +273,8 @@ void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
     // Draw star pixel/small square
     for (int dx = 0; dx < 2; ++dx) {
       for (int dy = 0; dy < 2; ++dy) {
-        SetPixel(memoryDeviceContext, static_cast<int>(star.xPosition) + dx,
-                 static_cast<int>(star.yPosition) + dy, starColor);
+        SetPixel(memoryDeviceContext, static_cast<int>(star.xPosition) + dx, static_cast<int>(star.yPosition) + dy,
+                 starColor);
       }
     }
   }
@@ -355,8 +349,7 @@ void DesktopUserInterface::UpdateDemosceneAnimation(HWND hwnd) {
   }
 
   // Force partial redraw of animation areas without erasing background, fully avoiding flicker
-  RECT scrollerRect = {0, clientRectangle.bottom - 65, clientRectangle.right,
-                       clientRectangle.bottom};
+  RECT scrollerRect = {0, clientRectangle.bottom - 65, clientRectangle.right, clientRectangle.bottom};
   InvalidateRect(hwnd, &scrollerRect, FALSE);
 
   RECT headerRect = {0, 0, clientRectangle.right, 65};
@@ -366,8 +359,7 @@ void DesktopUserInterface::UpdateDemosceneAnimation(HWND hwnd) {
   RECT backgroundLeftRect = {0, 65, 18, clientRectangle.bottom - 65};
   InvalidateRect(hwnd, &backgroundLeftRect, FALSE);
 
-  RECT backgroundRightRect = {clientRectangle.right - 18, 65, clientRectangle.right,
-                              clientRectangle.bottom - 65};
+  RECT backgroundRightRect = {clientRectangle.right - 18, 65, clientRectangle.right, clientRectangle.bottom - 65};
   InvalidateRect(hwnd, &backgroundRightRect, FALSE);
 }
 
@@ -375,9 +367,8 @@ void DesktopUserInterface::UpdateDemosceneAnimation(HWND hwnd) {
 // Custom Painted Subclassed Button Control Procedural
 // -----------------------------------------------------------------------------
 
-LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message, WPARAM wparam,
-                                                        LPARAM lparam, UINT_PTR subclassId,
-                                                        DWORD_PTR refData) {
+LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
+                                                        UINT_PTR subclassId, DWORD_PTR refData) {
   switch (message) {
   case WM_PAINT: {
     PAINTSTRUCT ps;
@@ -459,14 +450,11 @@ void DesktopUserInterface::RefreshInstalledList() {
         break;
       }
     }
-    ListView_SetItemText(m_packageListView, static_cast<int>(i), 1,
-                         const_cast<LPWSTR>(installedVersionStr.c_str()));
+    ListView_SetItemText(m_packageListView, static_cast<int>(i), 1, const_cast<LPWSTR>(installedVersionStr.c_str()));
 
     // Status
-    std::wstring statusText =
-        (installedVersionStr == L"Not Installed") ? L"Available" : L"Installed & Registered";
-    ListView_SetItemText(m_packageListView, static_cast<int>(i), 2,
-                         const_cast<LPWSTR>(statusText.c_str()));
+    std::wstring statusText = (installedVersionStr == L"Not Installed") ? L"Available" : L"Installed & Registered";
+    ListView_SetItemText(m_packageListView, static_cast<int>(i), 2, const_cast<LPWSTR>(statusText.c_str()));
   }
 }
 
@@ -499,8 +487,7 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
     auto* heapVersionsList = new std::vector<PackageVersion>(std::move(versionsList));
 
     // Populate UI in main thread context
-    SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, 0),
-                reinterpret_cast<LPARAM>(heapVersionsList));
+    SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, 0), reinterpret_cast<LPARAM>(heapVersionsList));
   }).detach();
 }
 
@@ -525,21 +512,18 @@ void DesktopUserInterface::TriggerInstallation() {
     auto provider = m_providers[packageIndex].get();
     auto url = provider->GetDownloadUrl(version);
     auto destinationDir = m_manifest->GetInstallationRootDirectory() / provider->GetIdentifier();
-    auto tempArchive = m_manifest->GetInstallationRootDirectory() /
-                       ("temp_" + provider->GetArchiveFilename(version));
+    auto tempArchive = m_manifest->GetInstallationRootDirectory() / ("temp_" + provider->GetArchiveFilename(version));
 
     std::wstring displayName = Utils::ToWString(provider->GetDisplayName());
 
     // Thread-safe log reporting via window messages
     PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(
-                    new std::wstring(L"--------------------------------------------------")));
+                reinterpret_cast<LPARAM>(new std::wstring(L"--------------------------------------------------")));
     PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(new std::wstring(
-                    std::format(L"Installation target: {} (Version: {})", displayName, wVer))));
-    PostMessage(
-        m_mainWindow, WM_APP + 1, 0,
-        reinterpret_cast<LPARAM>(new std::wstring(L"Source URL: " + Utils::ToWString(url))));
+                reinterpret_cast<LPARAM>(
+                    new std::wstring(std::format(L"Installation target: {} (Version: {})", displayName, wVer))));
+    PostMessage(m_mainWindow, WM_APP + 1, 0,
+                reinterpret_cast<LPARAM>(new std::wstring(L"Source URL: " + Utils::ToWString(url))));
 
     std::filesystem::create_directories(m_manifest->GetInstallationRootDirectory());
 
@@ -556,20 +540,17 @@ void DesktopUserInterface::TriggerInstallation() {
       if (percent >= tracker->lastLoggedPercent + 10 || percent == 100) {
         tracker->lastLoggedPercent = percent / 10 * 10;
         std::wstring progressLog = std::format(L"Binaries download progress: {}%", percent);
-        PostMessage(m_mainWindow, WM_APP + 1, 0,
-                    reinterpret_cast<LPARAM>(new std::wstring(progressLog)));
+        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(progressLog)));
       }
-      std::wstring text =
-          std::format(L"Status: Downloading package binaries... {:.1f}%", progress * 100.0f);
+      std::wstring text = std::format(L"Status: Downloading package binaries... {:.1f}%", progress * 100.0f);
       SetWindowTextW(m_statusStatusBar, text.c_str());
     });
 
     if (downloadSuccess) {
       PostMessage(m_mainWindow, WM_APP + 1, 0,
                   reinterpret_cast<LPARAM>(new std::wstring(L"Download completed successfully.")));
-      PostMessage(
-          m_mainWindow, WM_APP + 1, 0,
-          reinterpret_cast<LPARAM>(new std::wstring(L"Extracting files using native tar.exe...")));
+      PostMessage(m_mainWindow, WM_APP + 1, 0,
+                  reinterpret_cast<LPARAM>(new std::wstring(L"Extracting files using native tar.exe...")));
 
       SetWindowTextW(m_statusStatusBar, L"Status: Extracting compressed archive files...");
       std::filesystem::create_directories(destinationDir);
@@ -590,25 +571,22 @@ void DesktopUserInterface::TriggerInstallation() {
         auto now = std::chrono::system_clock::now();
         std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
         std::tm timeStruct = *std::localtime(&nowTime);
-        state.installationDate = std::format("{:04}-{:02}-{:02}", timeStruct.tm_year + 1900,
-                                             timeStruct.tm_mon + 1, timeStruct.tm_mday);
+        state.installationDate =
+            std::format("{:04}-{:02}-{:02}", timeStruct.tm_year + 1900, timeStruct.tm_mon + 1, timeStruct.tm_mday);
 
         m_manifest->RegisterOrUpdateInstalledPackage(state);
 
-        PostMessage(m_mainWindow, WM_APP + 1, 0,
-                    reinterpret_cast<LPARAM>(new std::wstring(L"Extraction complete.")));
-        PostMessage(m_mainWindow, WM_APP + 1, 0,
-                    reinterpret_cast<LPARAM>(new std::wstring(
-                        std::format(L"Success: {} successfully installed at {}", displayName,
-                                    Utils::ToWString(destinationDir.string())))));
-        SetWindowTextW(m_statusStatusBar,
-                       L"Status: Installation completed and registered successfully!");
+        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"Extraction complete.")));
+        PostMessage(
+            m_mainWindow, WM_APP + 1, 0,
+            reinterpret_cast<LPARAM>(new std::wstring(std::format(
+                L"Success: {} successfully installed at {}", displayName, Utils::ToWString(destinationDir.string())))));
+        SetWindowTextW(m_statusStatusBar, L"Status: Installation completed and registered successfully!");
       } else {
         PostMessage(m_mainWindow, WM_APP + 1, 0,
-                    reinterpret_cast<LPARAM>(new std::wstring(
-                        L"ERROR: Archive extraction failed (tar.exe exit code non-zero).")));
-        SetWindowTextW(m_statusStatusBar,
-                       L"Status: Extraction failed. Archive file might be corrupted.");
+                    reinterpret_cast<LPARAM>(
+                        new std::wstring(L"ERROR: Archive extraction failed (tar.exe exit code non-zero).")));
+        SetWindowTextW(m_statusStatusBar, L"Status: Extraction failed. Archive file might be corrupted.");
       }
     } else {
       PostMessage(m_mainWindow, WM_APP + 1, 0,
@@ -667,17 +645,14 @@ void DesktopUserInterface::TriggerUninstallation() {
   // Run uninstallation on background thread
   std::thread([packageIndex, packageId, displayName]() {
     PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(
-                    new std::wstring(L"--------------------------------------------------")));
+                reinterpret_cast<LPARAM>(new std::wstring(L"--------------------------------------------------")));
     PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(
-                    new std::wstring(std::format(L"Uninstallation target: {}", displayName))));
+                reinterpret_cast<LPARAM>(new std::wstring(std::format(L"Uninstallation target: {}", displayName))));
 
     auto packageState = m_manifest->GetInstalledPackageByIdentifier(packageId);
     if (!packageState.has_value()) {
       PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(
-                      new std::wstring(L"ERROR: Package is not registered as installed.")));
+                  reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Package is not registered as installed.")));
       SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation failed.");
 
       // Re-enable controls via message 3002
@@ -687,8 +662,7 @@ void DesktopUserInterface::TriggerUninstallation() {
 
     std::wstring installPathStr = Utils::ToWString(packageState->installationPath.string());
     PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(
-                    new std::wstring(L"Removing installation files at: " + installPathStr)));
+                reinterpret_cast<LPARAM>(new std::wstring(L"Removing installation files at: " + installPathStr)));
 
     try {
       if (std::filesystem::exists(packageState->installationPath)) {
@@ -700,14 +674,13 @@ void DesktopUserInterface::TriggerUninstallation() {
       PostMessage(m_mainWindow, WM_APP + 1, 0,
                   reinterpret_cast<LPARAM>(new std::wstring(L"Files removed successfully.")));
       PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(new std::wstring(
-                      std::format(L"Success: {} uninstalled successfully.", displayName))));
+                  reinterpret_cast<LPARAM>(
+                      new std::wstring(std::format(L"Success: {} uninstalled successfully.", displayName))));
       SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation completed successfully!");
     } catch (const std::exception& ex) {
       std::wstring errorMsg = Utils::ToWString(ex.what());
       PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(
-                      new std::wstring(L"ERROR: Failed to uninstall package: " + errorMsg)));
+                  reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Failed to uninstall package: " + errorMsg)));
       SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation failed.");
     }
 
@@ -720,8 +693,7 @@ void DesktopUserInterface::TriggerUninstallation() {
 // Main WndProc Callbacks
 // -----------------------------------------------------------------------------
 
-LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPARAM wparam,
-                                                   LPARAM lparam) {
+LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
   switch (message) {
   case WM_CREATE:
     return 0;
@@ -782,8 +754,7 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
     // Threading Messages
     if (commandId == 3001) { // Asynchronous versions query callback completed
       // Wrap in std::unique_ptr to ensure the heap-allocated vector is cleaned up automatically
-      std::unique_ptr<std::vector<PackageVersion>> versions(
-          reinterpret_cast<std::vector<PackageVersion>*>(lparam));
+      std::unique_ptr<std::vector<PackageVersion>> versions(reinterpret_cast<std::vector<PackageVersion>*>(lparam));
       for (const auto& v : *versions) {
         std::wstring wVersion = Utils::ToWString(v);
         SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
@@ -820,8 +791,8 @@ void DesktopUserInterface::AppendLog(const std::wstring& message) {
   std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
   std::tm timeStruct = *std::localtime(&nowTime);
 
-  std::wstring timeString = std::format(L"[{:02}:{:02}:{:02}] ", timeStruct.tm_hour,
-                                        timeStruct.tm_min, timeStruct.tm_sec);
+  std::wstring timeString =
+      std::format(L"[{:02}:{:02}:{:02}] ", timeStruct.tm_hour, timeStruct.tm_min, timeStruct.tm_sec);
 
   std::wstring fullLine = timeString + message + L"\r\n";
 
@@ -834,8 +805,7 @@ void DesktopUserInterface::AppendLog(const std::wstring& message) {
 } // namespace CatUpdate
 
 // Win32 Entry point
-extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine,
-                               int nCmdShow) {
+extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
   return CatUpdate::DesktopUserInterface::Run(hInstance, nCmdShow);
 }
 

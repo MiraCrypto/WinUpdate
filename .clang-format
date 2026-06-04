@@ -2,6 +2,7 @@
 Language: Cpp
 BasedOnStyle: LLVM
 Standard: c++20
-ColumnLimit: 100
+ColumnLimit: 120
 PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Empty
 ...

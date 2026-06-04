@@ -17,8 +17,7 @@ void SystemLogger::LogInformation(const std::string& message) {
   std::cout << "[INFO] " << message << '\n';
 }
 
-void SystemLogger::LogError(const std::string& message,
-                            const std::optional<std::string>& exceptionMessage) {
+void SystemLogger::LogError(const std::string& message, const std::optional<std::string>& exceptionMessage) {
   std::cerr << "[ERROR] " << message;
   if (exceptionMessage.has_value()) {
     std::cerr << " Details: " << exceptionMessage.value();
@@ -86,8 +85,7 @@ bool ManifestManager::SaveManifestToFile() {
   try {
     std::filesystem::create_directories(m_installationRootDirectory);
   } catch (const std::exception& ex) {
-    SystemLogger::LogError("Failed to create root installation directory: " +
-                               m_installationRootDirectory.string(),
+    SystemLogger::LogError("Failed to create root installation directory: " + m_installationRootDirectory.string(),
                            ex.what());
     return false;
   }
@@ -97,10 +95,10 @@ bool ManifestManager::SaveManifestToFile() {
   jsonData["packages"] = nlohmann::json::array();
 
   for (const auto& package : m_installedPackages) {
-    nlohmann::json pkgJson = {{"id", package.identifier},
-                              {"version", package.installedVersion},
-                              {"install_path", package.installationPath.string()},
-                              {"install_date", package.installationDate}};
+    const nlohmann::json pkgJson = {{"id", package.identifier},
+                                    {"version", package.installedVersion},
+                                    {"install_path", package.installationPath.string()},
+                                    {"install_date", package.installationDate}};
     jsonData["packages"].push_back(pkgJson);
   }
 

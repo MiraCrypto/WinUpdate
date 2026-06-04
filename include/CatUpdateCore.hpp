@@ -43,8 +43,7 @@ struct InstalledPackageState {
 class SystemLogger {
 public:
   static void LogInformation(const std::string& message);
-  static void LogError(const std::string& message,
-                       const std::optional<std::string>& exceptionMessage = std::nullopt);
+  static void LogError(const std::string& message, const std::optional<std::string>& exceptionMessage = std::nullopt);
 };
 
 /**

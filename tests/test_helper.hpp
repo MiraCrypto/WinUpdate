@@ -34,8 +34,9 @@ private:
 
 // Macro helper to define tests
 #define TEST(SuiteName, TestName)                                                                  \
-  void SuiteName##_##TestName##_Func();                                                            \
-  static const struct SuiteName##_##TestName##_Register {                                          \
+  static void SuiteName##_##TestName##_Func(); /* NOLINT(misc-use-anonymous-namespace) */          \
+  namespace {                                                                                      \
+  const struct SuiteName##_##TestName##_Register {                                                 \
     SuiteName##_##TestName##_Register() noexcept {                                                 \
       try {                                                                                        \
         ::CatUpdate::TestRunner::Instance().RegisterTestCase(#SuiteName, #TestName,                \
@@ -44,7 +45,8 @@ private:
       }                                                                                            \
     }                                                                                              \
   } SuiteName##_##TestName##_RegInstance;                                                          \
-  void SuiteName##_##TestName##_Func()
+  }                                                                                                \
+  static void SuiteName##_##TestName##_Func() /* NOLINT(misc-use-anonymous-namespace) */
 
 // Custom assert helper
 #define ASSERT_TRUE(condition)                                                                     \

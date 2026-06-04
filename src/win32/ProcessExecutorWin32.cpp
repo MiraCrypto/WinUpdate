@@ -60,8 +60,8 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
   PROCESS_INFORMATION processInfo = {};
 
   // Launch process with CREATE_NO_WINDOW flag
-  BOOL success = CreateProcessW(NULL, const_cast<LPWSTR>(commandLine.c_str()), NULL, NULL, TRUE,
-                                CREATE_NO_WINDOW, NULL, NULL, &startupInfo, &processInfo);
+  BOOL success = CreateProcessW(NULL, const_cast<LPWSTR>(commandLine.c_str()), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL,
+                                NULL, &startupInfo, &processInfo);
 
   // Close the write end of the pipe as we no longer need it
   CloseHandle(stdoutWritePipe);
@@ -76,8 +76,7 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
   std::string standardOutput;
   std::array<char, 1024> buffer;
   DWORD bytesRead = 0;
-  while (ReadFile(stdoutReadPipe, buffer.data(), static_cast<DWORD>(buffer.size() - 1), &bytesRead,
-                  NULL) &&
+  while (ReadFile(stdoutReadPipe, buffer.data(), static_cast<DWORD>(buffer.size() - 1), &bytesRead, NULL) &&
          bytesRead > 0) {
     buffer[bytesRead] = '\0';
     standardOutput.append(buffer.data(), bytesRead);
@@ -100,8 +99,7 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
   return result;
 }
 
-std::optional<ProcessExecutionResult>
-ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
+std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
   std::wstring wCommandLine = Utils::ToWString(shellCommandLine);
   std::wstring fullCommand = L"cmd.exe /c " + wCommandLine;
 
@@ -124,8 +122,8 @@ ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
 
   PROCESS_INFORMATION processInfo = {};
 
-  BOOL success = CreateProcessW(NULL, const_cast<LPWSTR>(fullCommand.c_str()), NULL, NULL, TRUE,
-                                CREATE_NO_WINDOW, NULL, NULL, &startupInfo, &processInfo);
+  BOOL success = CreateProcessW(NULL, const_cast<LPWSTR>(fullCommand.c_str()), NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL,
+                                NULL, &startupInfo, &processInfo);
 
   CloseHandle(stdoutWritePipe);
 
@@ -137,8 +135,7 @@ ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
   std::string standardOutput;
   std::array<char, 1024> buffer;
   DWORD bytesRead = 0;
-  while (ReadFile(stdoutReadPipe, buffer.data(), static_cast<DWORD>(buffer.size() - 1), &bytesRead,
-                  NULL) &&
+  while (ReadFile(stdoutReadPipe, buffer.data(), static_cast<DWORD>(buffer.size() - 1), &bytesRead, NULL) &&
          bytesRead > 0) {
     buffer[bytesRead] = '\0';
     standardOutput.append(buffer.data(), bytesRead);

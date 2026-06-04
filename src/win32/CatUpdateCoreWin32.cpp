@@ -12,8 +12,7 @@ namespace CatUpdate {
 
 std::filesystem::path PathResolver::GetDefaultInstallationRootPath() {
   WCHAR publicDocumentsPath[MAX_PATH];
-  HRESULT result =
-      SHGetFolderPathW(NULL, CSIDL_COMMON_DOCUMENTS, NULL, SHGFP_TYPE_CURRENT, publicDocumentsPath);
+  HRESULT result = SHGetFolderPathW(NULL, CSIDL_COMMON_DOCUMENTS, NULL, SHGFP_TYPE_CURRENT, publicDocumentsPath);
   if (SUCCEEDED(result)) {
     return std::filesystem::path(publicDocumentsPath);
   }
@@ -37,11 +36,9 @@ std::wstring Utils::ToWString(const std::string& utf8Str) {
   if (utf8Str.empty()) {
     return L"";
   }
-  int sizeNeeded =
-      MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), NULL, 0);
+  int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), NULL, 0);
   std::wstring wstrTo(sizeNeeded, 0);
-  MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), wstrTo.data(),
-                      sizeNeeded);
+  MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), wstrTo.data(), sizeNeeded);
   return wstrTo;
 }
 
@@ -49,11 +46,11 @@ std::string Utils::ToString(const std::wstring& utf16Str) {
   if (utf16Str.empty()) {
     return "";
   }
-  int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(),
-                                       static_cast<int>(utf16Str.size()), NULL, 0, NULL, NULL);
+  int sizeNeeded =
+      WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), NULL, 0, NULL, NULL);
   std::string strTo(sizeNeeded, 0);
-  WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), strTo.data(),
-                      sizeNeeded, NULL, NULL);
+  WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), strTo.data(), sizeNeeded, NULL,
+                      NULL);
   return strTo;
 }
 
