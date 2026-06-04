@@ -1,7 +1,9 @@
 #include "CatUpdateCore.hpp"
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <pwd.h>
-#include <sys/types.h>
+#include <string>
 #include <unistd.h>
 
 namespace CatUpdate {
