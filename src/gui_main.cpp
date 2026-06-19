@@ -59,7 +59,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   windowClass.hbrBackground = m_backgroundBrush;
   windowClass.lpszClassName = L"CatUpdateMainWindowClass";
 
-  if (RegisterClassExW(&windowClass) == 0u) {
+  if (RegisterClassExW(&windowClass) == 0U) {
     SystemLogger::LogError("Failed to register main Win32 window class.");
     return 1;
   }
@@ -131,7 +131,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
 
 void DesktopUserInterface::CreateControls(HWND parentWindow) {
   // Get default system GUI font
-  auto defaultSystemFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+  auto* defaultSystemFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
 
   // Software Packages ListView (Grid view of applications)
   m_packageListView =
@@ -269,7 +269,7 @@ void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
   // 1. Initialize Double Buffering to completely eliminate flickers
   HDC memoryDeviceContext = CreateCompatibleDC(hdc);
   HBITMAP memoryBitmap = CreateCompatibleBitmap(hdc, width, height);
-  auto oldBitmap = static_cast<HBITMAP>(SelectObject(memoryDeviceContext, memoryBitmap));
+  auto* oldBitmap = static_cast<HBITMAP>(SelectObject(memoryDeviceContext, memoryBitmap));
 
   // 2. Draw solid dark space background
   FillRect(memoryDeviceContext, &clientRectangle, m_backgroundBrush);
@@ -295,7 +295,7 @@ void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
   }
 
   // 4. Draw Top Hacker banner heading
-  auto originalFont = static_cast<HFONT>(SelectObject(memoryDeviceContext, m_demosceneFont));
+  auto* originalFont = static_cast<HFONT>(SelectObject(memoryDeviceContext, m_demosceneFont));
   SetBkMode(memoryDeviceContext, TRANSPARENT);
 
   // Draw header text with glowing shadow effect
@@ -414,8 +414,8 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
     GetWindowTextW(hwnd, buttonText, 128);
 
     // Render text
-    auto defaultSystemFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-    auto oldFont = static_cast<HFONT>(SelectObject(hdc, defaultSystemFont));
+    auto* defaultSystemFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+    auto* oldFont = static_cast<HFONT>(SelectObject(hdc, defaultSystemFont));
 
     SetBkMode(hdc, TRANSPARENT);
     if (IsWindowEnabled(hwnd) != 0) {

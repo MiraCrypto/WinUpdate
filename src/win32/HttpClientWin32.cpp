@@ -10,7 +10,7 @@
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h> // NOLINT(misc-include-cleaner)
+#include <windows.h>
 #include <winhttp.h>
 
 namespace CatUpdate {

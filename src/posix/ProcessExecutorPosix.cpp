@@ -25,7 +25,7 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
     return std::nullopt;
   }
 
-  const pid_t pid = fork(); // NOLINT(misc-include-cleaner)
+  const pid_t pid = fork();
   if (pid == -1) {
     close(stdoutPipe[0]);
     close(stdoutPipe[1]);
@@ -66,7 +66,7 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
   std::string standardOutput;
   while (true) {
     std::array<char, 1024> buffer{};
-    const ssize_t bytesRead = read(stdoutPipe[0], buffer.data(), buffer.size() - 1); // NOLINT(misc-include-cleaner)
+    const ssize_t bytesRead = read(stdoutPipe[0], buffer.data(), buffer.size() - 1);
     if (bytesRead <= 0) {
       break;
     }
@@ -95,7 +95,7 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
 std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
   // Append 2>&1 to shell command to merge stderr into stdout
   const std::string commandWithRedirect = shellCommandLine + " 2>&1";
-  FILE* fileStream = popen(commandWithRedirect.c_str(), "r"); // NOLINT(bugprone-command-processor,misc-include-cleaner)
+  FILE* fileStream = popen(commandWithRedirect.c_str(), "r"); // NOLINT(bugprone-command-processor)
   if (fileStream == nullptr) {
     return std::nullopt;
   }
@@ -106,7 +106,7 @@ std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteShellCommand(const
     standardOutput.append(buffer.data());
   }
 
-  int status = pclose(fileStream); // NOLINT(misc-include-cleaner)
+  const int status = pclose(fileStream);
   int exitCode = 0;
   if (WIFEXITED(status)) {
     exitCode = WEXITSTATUS(status);
