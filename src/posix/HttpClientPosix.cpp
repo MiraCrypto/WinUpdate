@@ -1,5 +1,5 @@
-#include "HttpClient.hpp"
 #include "CatUpdateCore.hpp"
+#include "HttpClient.hpp"
 #include "ProcessExecutor.hpp"
 #include <filesystem>
 #include <memory>

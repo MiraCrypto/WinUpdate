@@ -1,9 +1,9 @@
 #include "CatUpdateCore.hpp"
-#include "json.hpp"
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <utility>

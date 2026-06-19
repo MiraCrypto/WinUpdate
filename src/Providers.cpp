@@ -2,11 +2,11 @@
 #include "CatUpdateCore.hpp"
 #include "HttpClient.hpp"
 #include "PlatformTraits.hpp"
-#include "json.hpp"
 #include <cstddef>
 #include <exception>
 #include <format>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <utility>
 #include <vector>

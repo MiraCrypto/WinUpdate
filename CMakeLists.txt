@@ -35,6 +35,7 @@ add_library(catupdate-core STATIC
 
 # Header search paths for the library and its dependents
 target_include_directories(catupdate-core PUBLIC include)
+target_include_directories(catupdate-core SYSTEM PRIVATE third_party)
 
 # Platform-specific abstraction sources
 if(WIN32)

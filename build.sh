@@ -19,10 +19,10 @@ if ! command -v cmake &> /dev/null; then
 fi
 
 # 2. Download json.hpp if missing
-if [ ! -f "include/json.hpp" ]; then
+if [ ! -f "third_party/nlohmann/json.hpp" ]; then
     echo "Downloading nlohmann/json..."
-    mkdir -p include
-    curl -L "$JSON_URL" -o include/json.hpp
+    mkdir -p third_party/nlohmann
+    curl -L "$JSON_URL" -o third_party/nlohmann/json.hpp
 fi
 
 # 3. Setup build directory
