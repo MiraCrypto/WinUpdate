@@ -23,8 +23,8 @@ jobs:
 
     - name: Download json.hpp
       run: |
-        mkdir -p include
-        curl -L "https://github.com/nlohmann/json/releases/latest/download/json.hpp" -o include/json.hpp
+        mkdir -p third_party/nlohmann
+        curl -L "https://github.com/nlohmann/json/releases/latest/download/json.hpp" -o third_party/nlohmann/json.hpp
 
     - name: Configure with CMake
       run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -56,16 +56,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y mingw-w64 cmake make curl
 
-    - name: Download json.hpp
-      run: |
-        mkdir -p include
-        curl -L "https://github.com/nlohmann/json/releases/latest/download/json.hpp" -o include/json.hpp
-
-    - name: Configure with CMake
-      run: cmake -S . -B build-windows -DCMAKE_TOOLCHAIN_FILE=toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build Windows CLI and Demoscene GUI
-      run: cmake --build build-windows
+    - name: Build Windows Targets via script
+      run: ./build.sh
 
     - name: Upload Windows CLI Executable
       uses: actions/upload-artifact@v4
