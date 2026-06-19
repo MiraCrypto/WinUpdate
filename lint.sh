@@ -32,29 +32,49 @@ if [ "$1" == "format" ]; then
     exit 0
 elif [ "$1" == "fix" ]; then
     echo "Running static analyzer with auto-fixes..."
-    if [ ! -f "build/compile_commands.json" ] && [ ! -f "build-windows/compile_commands.json" ]; then
-        echo "Error: compile_commands.json not found. Please run cmake first to generate the compilation database."
-        exit 1
+    TARGET="native"
+    if [ "$2" == "windows" ] || [ "$2" == "win32" ] || [ "$2" == "build-windows" ]; then
+        TARGET="windows"
     fi
-    
+
+    # Determine build directory
     BUILD_DIR="build"
-    if [ ! -d "build" ] && [ -d "build-windows" ]; then
+    if [ "$TARGET" == "windows" ]; then
         BUILD_DIR="build-windows"
     fi
 
+    if [ ! -f "$BUILD_DIR/compile_commands.json" ]; then
+        echo "Error: $BUILD_DIR/compile_commands.json not found. Please run cmake first to generate the compilation database."
+        exit 1
+    fi
+
     EXTRA_ARGS=()
-    if [ "$(uname)" == "Darwin" ]; then
+    # Configure cross-compilation flags if targeting Windows
+    if [ "$TARGET" == "windows" ]; then
+        MINGW_COMPILER="x86_64-w64-mingw32-g++"
+        if command -v "$MINGW_COMPILER" &> /dev/null; then
+            SYSROOT=$("$MINGW_COMPILER" -print-sysroot 2>/dev/null || echo "")
+            if [ -n "$SYSROOT" ]; then
+                EXTRA_ARGS+=("-extra-arg=--target=x86_64-w64-mingw32" "-extra-arg=--sysroot=$SYSROOT")
+            fi
+        fi
+    elif [ "$(uname)" == "Darwin" ]; then
         SDK_PATH=$(xcrun --show-sdk-path 2>/dev/null || echo "")
         if [ -n "$SDK_PATH" ]; then
             EXTRA_ARGS+=("-extra-arg=-isysroot" "-extra-arg=$SDK_PATH")
         fi
     fi
 
-    # Pass all compilation units to clang-tidy using the database
-    find src tests -type f \( -name "*.cpp" \) | xargs "$CLANG_TIDY" -p "$BUILD_DIR" --fix-errors --format-style=file "${EXTRA_ARGS[@]}"
+    # Lint files depending on the target configuration
+    if [ "$TARGET" == "windows" ]; then
+        find src tests -type f \( -name "*.cpp" \) ! -path "src/posix/*" | xargs "$CLANG_TIDY" -p "$BUILD_DIR" --fix-errors --format-style=file "${EXTRA_ARGS[@]}"
+    else
+        find src tests -type f \( -name "*.cpp" \) ! -path "src/win32/*" ! -name "gui_main.cpp" | xargs "$CLANG_TIDY" -p "$BUILD_DIR" --fix-errors --format-style=file "${EXTRA_ARGS[@]}"
+    fi
+
     echo "Static analysis fixes complete."
     exit 0
 fi
 
-echo "Usage: ./lint.sh [format|fix]"
+echo "Usage: ./lint.sh [format|fix] [build_dir]"
 exit 1
