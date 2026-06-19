@@ -1,4 +1,5 @@
 #include "PlatformTraits.hpp"
+#include <string>
 
 namespace CatUpdate {
 

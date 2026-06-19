@@ -16,7 +16,7 @@ TEST(PathResolverTest, DefaultInstallPathResolution) {
   ASSERT_FALSE(rootPath.empty());
 #ifdef _WIN32
   // Public Documents typically contains "Public" or "Documents"
-  std::string pathStr = rootPath.string();
+  std::string const pathStr = rootPath.string();
   ASSERT_TRUE(pathStr.find("Public") != std::string::npos || pathStr.find("Documents") != std::string::npos);
 #else
   // ~/.local

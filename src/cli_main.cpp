@@ -423,7 +423,7 @@ int CommandLineInterface::ExecutePathCommand(const std::vector<std::string>& pat
 } // namespace CatUpdate
 
 #if defined(_WIN32) && defined(UNICODE)
-int wmain(int argc, wchar_t* argv[]) noexcept {
+int wmain(int argc, wchar_t* argv[]) noexcept { // NOLINT(misc-use-internal-linkage,readability-identifier-naming,cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
   try {
     std::vector<std::string> args;
     args.reserve(argc);

@@ -1,9 +1,23 @@
+#include "CatUpdateCore.hpp"
+#include <cstddef>
+#include <cstdlib>
+#include <ctime>
+#include <exception>
+#include <filesystem>
+#include <format>
+#include <memory>
+#include <minwindef.h>
+#include <string>
+#include <utility>
+#include <vector>
+#include <windef.h>
+#include <wingdi.h>
+#include <winnt.h>
 #ifdef _WIN32
 
-#define _WIN32_WINNT 0x0A00
-#define _WIN32_IE 0x0700
+#define WIN32_WINNT 0x0A00
+#define WIN32_IE 0x0700
 #include <windows.h>
-#include <winerror.h>
 
 #include <commctrl.h>
 #include <objbase.h>
@@ -15,8 +29,6 @@
 #include "Ui.hpp"
 #include <chrono>
 #include <cmath>
-#include <iomanip>
-#include <sstream>
 #include <thread>
 
 namespace CatUpdate {
@@ -36,7 +48,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   InitCommonControlsEx(&commonControlsInitEx);
 
   // Register the window class
-  WNDCLASSEXW windowClass = {sizeof(WNDCLASSEXW)};
+  WNDCLASSEXW windowClass = {.cbSize = sizeof(WNDCLASSEXW)};
   windowClass.style = CS_HREDRAW | CS_VREDRAW;
   windowClass.lpfnWndProc = MainWndProc;
   windowClass.hInstance = hinstance;
@@ -47,7 +59,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   windowClass.hbrBackground = m_backgroundBrush;
   windowClass.lpszClassName = L"CatUpdateMainWindowClass";
 
-  if (!RegisterClassExW(&windowClass)) {
+  if (RegisterClassExW(&windowClass) == 0u) {
     SystemLogger::LogError("Failed to register main Win32 window class.");
     return 1;
   }
@@ -57,7 +69,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
                                  WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT,
                                  800, 650, nullptr, nullptr, hinstance, nullptr);
 
-  if (!m_mainWindow) {
+  if (m_mainWindow == nullptr) {
     SystemLogger::LogError("Failed to create main Win32 window.");
     return 1;
   }
@@ -75,7 +87,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   RecalculateLayoutAndDpi(m_mainWindow);
 
   // Display Current Installation Path
-  std::wstring displayPath = L"Installation Path: " + defaultRootDirectory.wstring();
+  std::wstring const displayPath = L"Installation Path: " + defaultRootDirectory.wstring();
   SetWindowTextW(m_pathDisplayEdit, displayPath.c_str());
   SetWindowTextW(m_changePathButton, L"Change Path");
 
@@ -100,12 +112,15 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   }
 
   // Cleanup GDI resources
-  if (m_demosceneFont)
+  if (m_demosceneFont != nullptr) {
     DeleteObject(m_demosceneFont);
-  if (m_scrollerFont)
+  }
+  if (m_scrollerFont != nullptr) {
     DeleteObject(m_scrollerFont);
-  if (m_backgroundBrush)
+  }
+  if (m_backgroundBrush != nullptr) {
     DeleteObject(m_backgroundBrush);
+  }
 
   return static_cast<int>(windowMessage.wParam);
 }
@@ -116,7 +131,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
 
 void DesktopUserInterface::CreateControls(HWND parentWindow) {
   // Get default system GUI font
-  HFONT defaultSystemFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+  auto defaultSystemFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
 
   // Software Packages ListView (Grid view of applications)
   m_packageListView =
@@ -189,11 +204,11 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
 // GDI Demoscene Particle System & Assets
 // -----------------------------------------------------------------------------
 
-void DesktopUserInterface::InitializeDemosceneAssets(HWND parentWindow) {
+void DesktopUserInterface::InitializeDemosceneAssets(HWND /*parentWindow*/) {
   // Set up the moving particle starfield (100 stars with varying parallax depths)
   m_starfield.clear();
   for (int i = 0; i < 100; ++i) {
-    RetroStarParticle star;
+    RetroStarParticle star{};
     star.xPosition = static_cast<float>(rand() % 800);
     star.yPosition = static_cast<float>(rand() % 610);
 
@@ -201,11 +216,11 @@ void DesktopUserInterface::InitializeDemosceneAssets(HWND parentWindow) {
     star.intensityDepth = (rand() % 3) + 1;
 
     if (star.intensityDepth == 1) {
-      star.horizontalVelocity = 4.5f;
+      star.horizontalVelocity = 4.5F;
     } else if (star.intensityDepth == 2) {
-      star.horizontalVelocity = 2.5f;
+      star.horizontalVelocity = 2.5F;
     } else {
-      star.horizontalVelocity = 1.0f;
+      star.horizontalVelocity = 1.0F;
     }
 
     m_starfield.push_back(star);
@@ -225,13 +240,13 @@ void DesktopUserInterface::InitializeDemosceneAssets(HWND parentWindow) {
 
 void DesktopUserInterface::RecalculateLayoutAndDpi(HWND parentWindow) {
   HDC deviceContext = GetDC(parentWindow);
-  int pixelsPerInch = GetDeviceCaps(deviceContext, LOGPIXELSX);
+  int const pixelsPerInch = GetDeviceCaps(deviceContext, LOGPIXELSX);
   ReleaseDC(parentWindow, deviceContext);
 
-  m_dpiScaleFactor = static_cast<float>(pixelsPerInch) / 96.0f;
+  m_dpiScaleFactor = static_cast<float>(pixelsPerInch) / 96.0F;
 
   // Set Courier New monospaced font on terminal log edit
-  if (m_consoleLogEdit && m_scrollerFont) {
+  if ((m_consoleLogEdit != nullptr) && (m_scrollerFont != nullptr)) {
     SendMessage(m_consoleLogEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_scrollerFont), TRUE);
   }
 
@@ -248,13 +263,13 @@ void DesktopUserInterface::RecalculateLayoutAndDpi(HWND parentWindow) {
 void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
   RECT clientRectangle;
   GetClientRect(hwnd, &clientRectangle);
-  int width = clientRectangle.right;
-  int height = clientRectangle.bottom;
+  int const width = clientRectangle.right;
+  int const height = clientRectangle.bottom;
 
   // 1. Initialize Double Buffering to completely eliminate flickers
   HDC memoryDeviceContext = CreateCompatibleDC(hdc);
   HBITMAP memoryBitmap = CreateCompatibleBitmap(hdc, width, height);
-  HBITMAP oldBitmap = static_cast<HBITMAP>(SelectObject(memoryDeviceContext, memoryBitmap));
+  auto oldBitmap = static_cast<HBITMAP>(SelectObject(memoryDeviceContext, memoryBitmap));
 
   // 2. Draw solid dark space background
   FillRect(memoryDeviceContext, &clientRectangle, m_backgroundBrush);
@@ -280,7 +295,7 @@ void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
   }
 
   // 4. Draw Top Hacker banner heading
-  HFONT originalFont = static_cast<HFONT>(SelectObject(memoryDeviceContext, m_demosceneFont));
+  auto originalFont = static_cast<HFONT>(SelectObject(memoryDeviceContext, m_demosceneFont));
   SetBkMode(memoryDeviceContext, TRANSPARENT);
 
   // Draw header text with glowing shadow effect
@@ -293,20 +308,20 @@ void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
   SelectObject(memoryDeviceContext, m_scrollerFont);
   SetTextColor(memoryDeviceContext, RGB(57, 255, 20)); // Hacker Retro Green
 
-  int scrollerBaseY = height - 35;
-  int startDrawX = static_cast<int>(m_tickerScrollOffset);
+  int const scrollerBaseY = height - 35;
+  int const startDrawX = static_cast<int>(m_tickerScrollOffset);
 
   for (size_t i = 0; i < m_tickerText.length(); ++i) {
-    wchar_t character = m_tickerText[i];
-    int charWidth = 11; // Approximate monospaced width
-    int xCoordinate = startDrawX + static_cast<int>(i * charWidth);
+    wchar_t const character = m_tickerText[i];
+    int const charWidth = 11; // Approximate monospaced width
+    int const xCoordinate = startDrawX + static_cast<int>(i * charWidth);
 
     // Only draw if within bounds
     if (xCoordinate > -20 && xCoordinate < width + 20) {
       // Sine wave calculation mapping Y vertical displacement
-      float sineValue = std::sin(static_cast<float>(xCoordinate) / 45.0f + m_sineWavePhase);
-      int yOffset = static_cast<int>(sineValue * 15.0f);
-      int yCoordinate = scrollerBaseY + yOffset;
+      float const sineValue = std::sin((static_cast<float>(xCoordinate) / 45.0F) + m_sineWavePhase);
+      int const yOffset = static_cast<int>(sineValue * 15.0F);
+      int const yCoordinate = scrollerBaseY + yOffset;
 
       TextOutW(memoryDeviceContext, xCoordinate, yCoordinate, &character, 1);
     }
@@ -324,20 +339,20 @@ void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
 void DesktopUserInterface::UpdateDemosceneAnimation(HWND hwnd) {
   RECT clientRectangle;
   GetClientRect(hwnd, &clientRectangle);
-  int width = clientRectangle.right;
+  int const width = clientRectangle.right;
 
   // Scroll the scroller offset leftwards
-  m_tickerScrollOffset -= 2.0f;
+  m_tickerScrollOffset -= 2.0F;
 
   // Wrap scroller text when finished
-  int charWidth = 11;
-  int textTotalWidth = static_cast<int>(m_tickerText.length() * charWidth);
+  int const charWidth = 11;
+  int const textTotalWidth = static_cast<int>(m_tickerText.length() * charWidth);
   if (m_tickerScrollOffset < -textTotalWidth) {
     m_tickerScrollOffset = static_cast<float>(width);
   }
 
   // Shift sinusoidal wave phase factor
-  m_sineWavePhase += 0.08f;
+  m_sineWavePhase += 0.08F;
 
   // Shift star positions horizontally
   for (auto& star : m_starfield) {
@@ -349,17 +364,21 @@ void DesktopUserInterface::UpdateDemosceneAnimation(HWND hwnd) {
   }
 
   // Force partial redraw of animation areas without erasing background, fully avoiding flicker
-  RECT scrollerRect = {0, clientRectangle.bottom - 65, clientRectangle.right, clientRectangle.bottom};
+  RECT const scrollerRect = {
+      .left = 0, .top = clientRectangle.bottom - 65, .right = clientRectangle.right, .bottom = clientRectangle.bottom};
   InvalidateRect(hwnd, &scrollerRect, FALSE);
 
-  RECT headerRect = {0, 0, clientRectangle.right, 65};
+  RECT const headerRect = {.left = 0, .top = 0, .right = clientRectangle.right, .bottom = 65};
   InvalidateRect(hwnd, &headerRect, FALSE);
 
   // Repaint background regions around ListView
-  RECT backgroundLeftRect = {0, 65, 18, clientRectangle.bottom - 65};
+  RECT const backgroundLeftRect = {.left = 0, .top = 65, .right = 18, .bottom = clientRectangle.bottom - 65};
   InvalidateRect(hwnd, &backgroundLeftRect, FALSE);
 
-  RECT backgroundRightRect = {clientRectangle.right - 18, 65, clientRectangle.right, clientRectangle.bottom - 65};
+  RECT const backgroundRightRect = {.left = clientRectangle.right - 18,
+                                    .top = 65,
+                                    .right = clientRectangle.right,
+                                    .bottom = clientRectangle.bottom - 65};
   InvalidateRect(hwnd, &backgroundRightRect, FALSE);
 }
 
@@ -368,7 +387,7 @@ void DesktopUserInterface::UpdateDemosceneAnimation(HWND hwnd) {
 // -----------------------------------------------------------------------------
 
 LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
-                                                        UINT_PTR subclassId, DWORD_PTR refData) {
+                                                        UINT_PTR /*subclassId*/, DWORD_PTR /*refData*/) {
   switch (message) {
   case WM_PAINT: {
     PAINTSTRUCT ps;
@@ -376,8 +395,8 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
 
     RECT rect;
     GetClientRect(hwnd, &rect);
-    int width = rect.right;
-    int height = rect.bottom;
+    int const width = rect.right;
+    int const height = rect.bottom;
 
     // Draw gorgeous custom styled Cyberpunk buttons
     HBRUSH borderBrush = CreateSolidBrush(RGB(0, 240, 255));  // Neon Cyan border
@@ -386,7 +405,8 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
     FillRect(hdc, &rect, borderBrush);
 
     // Deflate interior rect to render border outline
-    RECT interiorRect = {rect.left + 2, rect.top + 2, rect.right - 2, rect.bottom - 2};
+    RECT const interiorRect = {
+        .left = rect.left + 2, .top = rect.top + 2, .right = rect.right - 2, .bottom = rect.bottom - 2};
     FillRect(hdc, &interiorRect, interiorBrush);
 
     // Fetch text content
@@ -394,11 +414,11 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
     GetWindowTextW(hwnd, buttonText, 128);
 
     // Render text
-    HFONT defaultSystemFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-    HFONT oldFont = static_cast<HFONT>(SelectObject(hdc, defaultSystemFont));
+    auto defaultSystemFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+    auto oldFont = static_cast<HFONT>(SelectObject(hdc, defaultSystemFont));
 
     SetBkMode(hdc, TRANSPARENT);
-    if (IsWindowEnabled(hwnd)) {
+    if (IsWindowEnabled(hwnd) != 0) {
       SetTextColor(hdc, RGB(57, 255, 20)); // Bright Neon Green text
     } else {
       SetTextColor(hdc, RGB(70, 70, 85)); // Dim grey text
@@ -433,12 +453,12 @@ void DesktopUserInterface::RefreshInstalledList() {
   auto installed = m_manifest->GetInstalledPackages();
 
   for (size_t i = 0; i < m_providers.size(); ++i) {
-    LVITEMW listItem = {0};
+    LVITEMW listItem = {.mask = 0};
     listItem.mask = LVIF_TEXT;
     listItem.iItem = static_cast<int>(i);
 
     // Package Name
-    std::wstring displayName = Utils::ToWString(m_providers[i]->GetDisplayName());
+    std::wstring const displayName = Utils::ToWString(m_providers[i]->GetDisplayName());
     listItem.pszText = const_cast<LPWSTR>(displayName.c_str());
     ListView_InsertItem(m_packageListView, &listItem);
 
@@ -453,19 +473,20 @@ void DesktopUserInterface::RefreshInstalledList() {
     ListView_SetItemText(m_packageListView, static_cast<int>(i), 1, const_cast<LPWSTR>(installedVersionStr.c_str()));
 
     // Status
-    std::wstring statusText = (installedVersionStr == L"Not Installed") ? L"Available" : L"Installed & Registered";
+    std::wstring const statusText =
+        (installedVersionStr == L"Not Installed") ? L"Available" : L"Installed & Registered";
     ListView_SetItemText(m_packageListView, static_cast<int>(i), 2, const_cast<LPWSTR>(statusText.c_str()));
   }
 }
 
 void DesktopUserInterface::OnPackageSelectionChanged() {
-  int selectedIndex = ListView_GetNextItem(m_packageListView, -1, LVNI_SELECTED);
+  int const selectedIndex = ListView_GetNextItem(m_packageListView, -1, LVNI_SELECTED);
   if (selectedIndex == -1 || selectedIndex == m_selectedPackageIndex) {
     return;
   }
   m_selectedPackageIndex = selectedIndex;
 
-  std::wstring packageDisplayName = Utils::ToWString(m_providers[selectedIndex]->GetDisplayName());
+  std::wstring const packageDisplayName = Utils::ToWString(m_providers[selectedIndex]->GetDisplayName());
   AppendLog(L"Selected package: " + packageDisplayName);
   AppendLog(L"Querying remote versions registry...");
 
@@ -473,7 +494,7 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
   EnableWindow(m_installButton, FALSE);
 
   // Enable/disable uninstall button immediately based on local installation state
-  bool isInstalled = m_manifest->IsPackageInstalled(m_providers[selectedIndex]->GetIdentifier());
+  bool const isInstalled = m_manifest->IsPackageInstalled(m_providers[selectedIndex]->GetIdentifier());
   EnableWindow(m_uninstallButton, isInstalled ? TRUE : FALSE);
 
   SendMessage(m_versionComboBox, CB_RESETCONTENT, 0, 0);
@@ -492,16 +513,16 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
 }
 
 void DesktopUserInterface::TriggerInstallation() {
-  int packageIndex = m_selectedPackageIndex;
-  int versionIndex = static_cast<int>(SendMessage(m_versionComboBox, CB_GETCURSEL, 0, 0));
+  int const packageIndex = m_selectedPackageIndex;
+  int const versionIndex = static_cast<int>(SendMessage(m_versionComboBox, CB_GETCURSEL, 0, 0));
   if (packageIndex == -1 || versionIndex == -1) {
     return;
   }
 
   wchar_t buffer[256];
   SendMessage(m_versionComboBox, CB_GETLBTEXT, versionIndex, reinterpret_cast<LPARAM>(buffer));
-  std::wstring wVer(buffer);
-  std::string version = Utils::ToString(wVer);
+  std::wstring const wVer(buffer);
+  std::string const version = Utils::ToString(wVer);
 
   SetWindowTextW(m_statusStatusBar, L"Status: Starting download sequence...");
   EnableWindow(m_installButton, FALSE);
@@ -509,7 +530,7 @@ void DesktopUserInterface::TriggerInstallation() {
 
   // Download & Extract inside background thread to maintain smooth scroller FPS
   std::thread([packageIndex, version, wVer]() {
-    auto provider = m_providers[packageIndex].get();
+    auto* provider = m_providers[packageIndex].get();
     auto url = provider->GetDownloadUrl(version);
     auto destinationDir = m_manifest->GetInstallationRootDirectory() / provider->GetIdentifier();
     auto tempArchive = m_manifest->GetInstallationRootDirectory() / ("temp_" + provider->GetArchiveFilename(version));
@@ -535,14 +556,14 @@ void DesktopUserInterface::TriggerInstallation() {
     };
     auto tracker = std::make_shared<DownloadProgressTracker>();
 
-    bool downloadSuccess = httpClient->DownloadFile(url, tempArchive, [tracker](float progress) {
-      int percent = static_cast<int>(progress * 100.0f);
+    bool const downloadSuccess = httpClient->DownloadFile(url, tempArchive, [tracker](float progress) {
+      int percent = static_cast<int>(progress * 100.0F);
       if (percent >= tracker->lastLoggedPercent + 10 || percent == 100) {
         tracker->lastLoggedPercent = percent / 10 * 10;
-        std::wstring progressLog = std::format(L"Binaries download progress: {}%", percent);
+        std::wstring const progressLog = std::format(L"Binaries download progress: {}%", percent);
         PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(progressLog)));
       }
-      std::wstring text = std::format(L"Status: Downloading package binaries... {:.1f}%", progress * 100.0f);
+      std::wstring const text = std::format(L"Status: Downloading package binaries... {:.1f}%", progress * 100.0F);
       SetWindowTextW(m_statusStatusBar, text.c_str());
     });
 
@@ -555,8 +576,8 @@ void DesktopUserInterface::TriggerInstallation() {
       SetWindowTextW(m_statusStatusBar, L"Status: Extracting compressed archive files...");
       std::filesystem::create_directories(destinationDir);
 
-      std::vector<std::string> extractionCommand = {"tar.exe", "-xf", tempArchive.string(), "-C",
-                                                    destinationDir.string()};
+      std::vector<std::string> const extractionCommand = {"tar.exe", "-xf", tempArchive.string(), "-C",
+                                                          destinationDir.string()};
 
       auto extractionResult = ProcessExecutor::ExecuteCommand(extractionCommand);
       std::filesystem::remove(tempArchive); // Cleanup temp zip file
@@ -601,7 +622,7 @@ void DesktopUserInterface::TriggerInstallation() {
 }
 
 void DesktopUserInterface::TriggerPathChange() {
-  BROWSEINFOW folderBrowseInfo = {0};
+  BROWSEINFOW folderBrowseInfo = {.hwndOwner = nullptr};
   folderBrowseInfo.hwndOwner = m_mainWindow;
   folderBrowseInfo.lpszTitle = L"Select No-Admin Installation Directory";
   folderBrowseInfo.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
@@ -609,13 +630,13 @@ void DesktopUserInterface::TriggerPathChange() {
   LPITEMIDLIST pidl = SHBrowseForFolderW(&folderBrowseInfo);
   if (pidl != nullptr) {
     wchar_t selectedPath[MAX_PATH];
-    if (SHGetPathFromIDListW(pidl, selectedPath)) {
-      std::filesystem::path path(selectedPath);
+    if (SHGetPathFromIDListW(pidl, selectedPath) != 0) {
+      std::filesystem::path const path(selectedPath);
 
       // Re-instantiate Manifest at new path
       m_manifest = std::make_unique<ManifestManager>(path);
 
-      std::wstring displayPath = L"Installation Path: " + path.wstring();
+      std::wstring const displayPath = L"Installation Path: " + path.wstring();
       SetWindowTextW(m_pathDisplayEdit, displayPath.c_str());
 
       AppendLog(L"Installation root path changed to: " + path.wstring());
@@ -628,14 +649,14 @@ void DesktopUserInterface::TriggerPathChange() {
 }
 
 void DesktopUserInterface::TriggerUninstallation() {
-  int packageIndex = m_selectedPackageIndex;
+  int const packageIndex = m_selectedPackageIndex;
   if (packageIndex == -1) {
     return;
   }
 
-  auto provider = m_providers[packageIndex].get();
+  auto* provider = m_providers[packageIndex].get();
   auto packageId = provider->GetIdentifier();
-  std::wstring displayName = Utils::ToWString(provider->GetDisplayName());
+  std::wstring const displayName = Utils::ToWString(provider->GetDisplayName());
 
   // Disable buttons during action
   EnableWindow(m_installButton, FALSE);
@@ -660,7 +681,7 @@ void DesktopUserInterface::TriggerUninstallation() {
       return;
     }
 
-    std::wstring installPathStr = Utils::ToWString(packageState->installationPath.string());
+    std::wstring const installPathStr = Utils::ToWString(packageState->installationPath.string());
     PostMessage(m_mainWindow, WM_APP + 1, 0,
                 reinterpret_cast<LPARAM>(new std::wstring(L"Removing installation files at: " + installPathStr)));
 
@@ -678,7 +699,7 @@ void DesktopUserInterface::TriggerUninstallation() {
                       new std::wstring(std::format(L"Success: {} uninstalled successfully.", displayName))));
       SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation completed successfully!");
     } catch (const std::exception& ex) {
-      std::wstring errorMsg = Utils::ToWString(ex.what());
+      std::wstring const errorMsg = Utils::ToWString(ex.what());
       PostMessage(m_mainWindow, WM_APP + 1, 0,
                   reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Failed to uninstall package: " + errorMsg)));
       SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation failed.");
@@ -698,9 +719,10 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
   case WM_CREATE:
     return 0;
   case WM_NCHITTEST: {
-    LRESULT hit = DefWindowProcW(hwnd, message, wparam, lparam);
-    if (hit == HTCLIENT)
+    LRESULT const hit = DefWindowProcW(hwnd, message, wparam, lparam);
+    if (hit == HTCLIENT) {
       return HTCAPTION;
+    }
     return hit;
   }
   case WM_TIMER:
@@ -733,15 +755,15 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
   case WM_ERASEBKGND:
     return 1; // Double buffer handles erasing entirely to avoid flicker
   case WM_NOTIFY: {
-    NMHDR* notifyHeader = reinterpret_cast<NMHDR*>(lparam);
+    auto const* notifyHeader = reinterpret_cast<NMHDR*>(lparam);
     if (notifyHeader->idFrom == 2001 && notifyHeader->code == LVN_ITEMCHANGED) {
       OnPackageSelectionChanged();
     }
     break;
   }
   case WM_COMMAND: {
-    int commandId = LOWORD(wparam);
-    int notificationCode = HIWORD(wparam);
+    int const commandId = LOWORD(wparam);
+    int const notificationCode = HIWORD(wparam);
 
     if (commandId == 2003) {
       TriggerInstallation();
@@ -754,9 +776,10 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
     // Threading Messages
     if (commandId == 3001) { // Asynchronous versions query callback completed
       // Wrap in std::unique_ptr to ensure the heap-allocated vector is cleaned up automatically
-      std::unique_ptr<std::vector<PackageVersion>> versions(reinterpret_cast<std::vector<PackageVersion>*>(lparam));
+      std::unique_ptr<std::vector<PackageVersion>> const versions(
+          reinterpret_cast<std::vector<PackageVersion>*>(lparam));
       for (const auto& v : *versions) {
-        std::wstring wVersion = Utils::ToWString(v);
+        std::wstring const wVersion = Utils::ToWString(v);
         SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
       }
       SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
@@ -769,7 +792,7 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
     break;
   }
   case WM_APP + 1: { // Asynchronous Thread Safe Logging message
-    std::unique_ptr<std::wstring> logMessage(reinterpret_cast<std::wstring*>(lparam));
+    std::unique_ptr<std::wstring> const logMessage(reinterpret_cast<std::wstring*>(lparam));
     AppendLog(*logMessage);
     return 0;
   }
@@ -782,7 +805,7 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
 }
 
 void DesktopUserInterface::AppendLog(const std::wstring& message) {
-  if (!m_consoleLogEdit) {
+  if (m_consoleLogEdit == nullptr) {
     return;
   }
 
@@ -791,13 +814,13 @@ void DesktopUserInterface::AppendLog(const std::wstring& message) {
   std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
   std::tm timeStruct = *std::localtime(&nowTime);
 
-  std::wstring timeString =
+  std::wstring const timeString =
       std::format(L"[{:02}:{:02}:{:02}] ", timeStruct.tm_hour, timeStruct.tm_min, timeStruct.tm_sec);
 
-  std::wstring fullLine = timeString + message + L"\r\n";
+  std::wstring const fullLine = timeString + message + L"\r\n";
 
   // Set selection focus to the end of edit control and append text
-  int length = GetWindowTextLengthW(m_consoleLogEdit);
+  int const length = GetWindowTextLengthW(m_consoleLogEdit);
   SendMessage(m_consoleLogEdit, EM_SETSEL, length, length);
   SendMessage(m_consoleLogEdit, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(fullLine.c_str()));
 }
@@ -805,7 +828,7 @@ void DesktopUserInterface::AppendLog(const std::wstring& message) {
 } // namespace CatUpdate
 
 // Win32 Entry point
-extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
+extern "C" int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*lpCmdLine*/, int nCmdShow) {
   return CatUpdate::DesktopUserInterface::Run(hInstance, nCmdShow);
 }
 

@@ -1,8 +1,15 @@
 #include "CatUpdateCore.hpp"
+#include <cstddef>
+#include <filesystem>
+#include <minwindef.h>
+#include <string>
+#include <stringapiset.h>
+#include <winerror.h>
+#include <winnls.h>
+#include <winnt.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <shlobj.h>
-#include <windows.h>
 
 namespace CatUpdate {
 
@@ -12,7 +19,8 @@ namespace CatUpdate {
 
 std::filesystem::path PathResolver::GetDefaultInstallationRootPath() {
   WCHAR publicDocumentsPath[MAX_PATH];
-  HRESULT result = SHGetFolderPathW(NULL, CSIDL_COMMON_DOCUMENTS, NULL, SHGFP_TYPE_CURRENT, publicDocumentsPath);
+  HRESULT const result =
+      SHGetFolderPathW(nullptr, CSIDL_COMMON_DOCUMENTS, nullptr, SHGFP_TYPE_CURRENT, publicDocumentsPath);
   if (SUCCEEDED(result)) {
     return std::filesystem::path(publicDocumentsPath);
   }
@@ -21,7 +29,7 @@ std::filesystem::path PathResolver::GetDefaultInstallationRootPath() {
 
 std::filesystem::path PathResolver::GetUserHomeDirectory() {
   WCHAR userProfilePath[MAX_PATH];
-  HRESULT result = SHGetFolderPathW(NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, userProfilePath);
+  HRESULT const result = SHGetFolderPathW(nullptr, CSIDL_PROFILE, nullptr, SHGFP_TYPE_CURRENT, userProfilePath);
   if (SUCCEEDED(result)) {
     return std::filesystem::path(userProfilePath);
   }
@@ -36,7 +44,7 @@ std::wstring Utils::ToWString(const std::string& utf8Str) {
   if (utf8Str.empty()) {
     return L"";
   }
-  int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), NULL, 0);
+  int const sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), nullptr, 0);
   std::wstring wstrTo(sizeNeeded, 0);
   MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), static_cast<int>(utf8Str.size()), wstrTo.data(), sizeNeeded);
   return wstrTo;
@@ -46,11 +54,11 @@ std::string Utils::ToString(const std::wstring& utf16Str) {
   if (utf16Str.empty()) {
     return "";
   }
-  int sizeNeeded =
-      WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), NULL, 0, NULL, NULL);
+  int const sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), nullptr,
+                                             0, nullptr, nullptr);
   std::string strTo(sizeNeeded, 0);
-  WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), strTo.data(), sizeNeeded, NULL,
-                      NULL);
+  WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), static_cast<int>(utf16Str.size()), strTo.data(), sizeNeeded,
+                      nullptr, nullptr);
   return strTo;
 }
 

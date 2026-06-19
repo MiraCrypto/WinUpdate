@@ -10,7 +10,7 @@ constexpr const char* const TEST_COLOR_CYAN = "\033[1;36m";
 constexpr const char* const TEST_COLOR_BOLD = "\033[1m";
 
 #if defined(_WIN32) && defined(UNICODE)
-int wmain() noexcept {
+int wmain() noexcept { // NOLINT(misc-use-internal-linkage,readability-identifier-naming)
 #else
 int main() noexcept {
 #endif
