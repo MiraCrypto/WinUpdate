@@ -1,4 +1,5 @@
 #include "CatUpdateCore.hpp"
+#include "PlatformTraits.hpp"
 #include "test_helper.hpp"
 #include <filesystem>
 #include <string>
@@ -90,5 +91,73 @@ TEST(UtilsTest, WideStringConversions) {
   const std::string roundTripUtf8 = Utils::ToString(convertedWString);
   ASSERT_TRUE(originalUtf8 == roundTripUtf8);
 }
+
+TEST(PlatformTraitsTest, GetPlatformProperties) {
+  auto type = PlatformTraits::GetPlatformType();
+  auto name = PlatformTraits::GetPlatformNameString();
+  auto ext = PlatformTraits::GetArchiveExtension();
+
+  ASSERT_FALSE(name.empty());
+  ASSERT_FALSE(ext.empty());
+
+#ifdef _WIN32
+  ASSERT_TRUE(type == PlatformType::Windows);
+  ASSERT_TRUE(name == "win-x64");
+  ASSERT_TRUE(ext == ".zip");
+#elif defined(__APPLE__)
+  ASSERT_TRUE(type == PlatformType::macOS);
+  ASSERT_TRUE(name == "darwin-x64");
+  ASSERT_TRUE(ext == ".tar.gz");
+#else
+  ASSERT_TRUE(type == PlatformType::Linux);
+  ASSERT_TRUE(name == "linux-x64");
+  ASSERT_TRUE(ext == ".tar.xz");
+#endif
+}
+
+#ifdef _WIN32
+TEST(PlatformTraitsTest, GetWindowsExtractionCommand) {
+  const std::filesystem::path archive = "test_archive.zip";
+  const std::filesystem::path dest = "test_destination";
+
+  auto cmd = PlatformTraits::GetExtractionCommand(archive, dest);
+  ASSERT_FALSE(cmd.empty());
+  ASSERT_TRUE(cmd.size() == 5);
+  ASSERT_TRUE(cmd[0] == "tar.exe");
+  ASSERT_TRUE(cmd[1] == "-xf");
+  ASSERT_TRUE(cmd[2] == archive.string());
+  ASSERT_TRUE(cmd[3] == "-C");
+  ASSERT_TRUE(cmd[4] == dest.string());
+}
+#else
+TEST(PlatformTraitsTest, GetPosixZipExtractionCommand) {
+  const std::filesystem::path archive = "test_archive.zip";
+  const std::filesystem::path dest = "test_destination";
+
+  auto cmd = PlatformTraits::GetExtractionCommand(archive, dest);
+  ASSERT_FALSE(cmd.empty());
+  ASSERT_TRUE(cmd.size() == 6);
+  ASSERT_TRUE(cmd[0] == "unzip");
+  ASSERT_TRUE(cmd[1] == "-q");
+  ASSERT_TRUE(cmd[2] == "-o");
+  ASSERT_TRUE(cmd[3] == archive.string());
+  ASSERT_TRUE(cmd[4] == "-d");
+  ASSERT_TRUE(cmd[5] == dest.string());
+}
+
+TEST(PlatformTraitsTest, GetPosixTarExtractionCommand) {
+  const std::filesystem::path archive = "test_archive.tar.gz";
+  const std::filesystem::path dest = "test_destination";
+
+  auto cmd = PlatformTraits::GetExtractionCommand(archive, dest);
+  ASSERT_FALSE(cmd.empty());
+  ASSERT_TRUE(cmd.size() == 5);
+  ASSERT_TRUE(cmd[0] == "tar");
+  ASSERT_TRUE(cmd[1] == "-xf");
+  ASSERT_TRUE(cmd[2] == archive.string());
+  ASSERT_TRUE(cmd[3] == "-C");
+  ASSERT_TRUE(cmd[4] == dest.string());
+}
+#endif
 
 } // namespace CatUpdate

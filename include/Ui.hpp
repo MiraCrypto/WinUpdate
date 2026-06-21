@@ -6,6 +6,8 @@
 #include "CatUpdateCore.hpp"
 #include "Providers.hpp"
 #include <commctrl.h>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 #include <windows.h>
@@ -70,6 +72,10 @@ private:
   inline static std::vector<std::unique_ptr<PackageProvider>> m_providers;
   inline static int m_selectedPackageIndex = -1;
   inline static std::wstring m_currentStatusText = L"Ready";
+  inline static bool m_isExecutingBackgroundAction = false;
+
+  inline static std::map<PackageIdentifier, std::vector<PackageVersion>> m_versionsCache;
+  inline static std::set<PackageIdentifier> m_pendingVersionQueries;
 
   // Demoscene Animation State
   inline static std::vector<RetroStarParticle> m_starfield;

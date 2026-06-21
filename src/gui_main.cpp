@@ -1,4 +1,5 @@
 #include "CatUpdateCore.hpp"
+#include "PackageManager.hpp"
 #include <cstddef>
 #include <cstdlib>
 #include <ctime>
@@ -444,6 +445,11 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
 // -----------------------------------------------------------------------------
 
 void DesktopUserInterface::RefreshInstalledList() {
+  m_isExecutingBackgroundAction = false;
+  EnableWindow(m_packageListView, TRUE);
+  EnableWindow(m_changePathButton, TRUE);
+  EnableWindow(m_versionComboBox, TRUE);
+
   ListView_DeleteAllItems(m_packageListView);
   m_selectedPackageIndex = -1;
   EnableWindow(m_installButton, FALSE);
@@ -486,21 +492,53 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
   }
   m_selectedPackageIndex = selectedIndex;
 
-  std::wstring const packageDisplayName = Utils::ToWString(m_providers[selectedIndex]->GetDisplayName());
-  AppendLog(L"Selected package: " + packageDisplayName);
-  AppendLog(L"Querying remote versions registry...");
+  auto* provider = m_providers[selectedIndex].get();
+  auto const packageId = provider->GetIdentifier();
+  std::wstring const packageDisplayName = Utils::ToWString(provider->GetDisplayName());
 
-  SetWindowTextW(m_statusStatusBar, L"Status: Querying remote versions registry...");
-  EnableWindow(m_installButton, FALSE);
+  AppendLog(L"Selected package: " + packageDisplayName);
 
   // Enable/disable uninstall button immediately based on local installation state
-  bool const isInstalled = m_manifest->IsPackageInstalled(m_providers[selectedIndex]->GetIdentifier());
+  bool const isInstalled = m_manifest->IsPackageInstalled(packageId);
   EnableWindow(m_uninstallButton, isInstalled ? TRUE : FALSE);
 
   SendMessage(m_versionComboBox, CB_RESETCONTENT, 0, 0);
 
+  // 1. Check Cache
+  auto const cacheIterator = m_versionsCache.find(packageId);
+  if (cacheIterator != m_versionsCache.end()) {
+    AppendLog(L"Loaded available versions list from memory cache.");
+    for (const auto& version : cacheIterator->second) {
+      std::wstring const wVersion = Utils::ToWString(version);
+      SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
+    }
+    SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
+
+    if (!m_isExecutingBackgroundAction) {
+      EnableWindow(m_installButton, TRUE);
+      SetWindowTextW(m_statusStatusBar, L"Status: Versions registry loaded from cache.");
+    } else {
+      SetWindowTextW(m_statusStatusBar, L"Status: Busy... Background action in progress.");
+    }
+    return;
+  }
+
+  // 2. Check In-Progress Queries
+  if (m_pendingVersionQueries.contains(packageId)) {
+    AppendLog(L"Version query is already in progress for this package.");
+    SetWindowTextW(m_statusStatusBar, L"Status: Querying remote versions registry (in progress)...");
+    EnableWindow(m_installButton, FALSE);
+    return;
+  }
+
+  // 3. Start New Query
+  m_pendingVersionQueries.insert(packageId);
+  AppendLog(L"Querying remote versions registry...");
+  SetWindowTextW(m_statusStatusBar, L"Status: Querying remote versions registry...");
+  EnableWindow(m_installButton, FALSE);
+
   // Fetch versions asynchronously to prevent GUI freezing
-  std::thread([selectedIndex]() {
+  std::thread([selectedIndex, packageId]() {
     auto httpClient = HttpClientFactory::CreateDefaultClient();
     auto versionsList = m_providers[selectedIndex]->FetchAvailableVersions(*httpClient);
 
@@ -508,7 +546,7 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
     auto* heapVersionsList = new std::vector<PackageVersion>(std::move(versionsList));
 
     // Populate UI in main thread context
-    SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, 0), reinterpret_cast<LPARAM>(heapVersionsList));
+    SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, selectedIndex), reinterpret_cast<LPARAM>(heapVersionsList));
   }).detach();
 }
 
@@ -524,31 +562,18 @@ void DesktopUserInterface::TriggerInstallation() {
   std::wstring const wVer(buffer);
   std::string const version = Utils::ToString(wVer);
 
+  m_isExecutingBackgroundAction = true;
   SetWindowTextW(m_statusStatusBar, L"Status: Starting download sequence...");
   EnableWindow(m_installButton, FALSE);
   EnableWindow(m_uninstallButton, FALSE);
+  EnableWindow(m_packageListView, FALSE);
+  EnableWindow(m_changePathButton, FALSE);
+  EnableWindow(m_versionComboBox, FALSE);
 
-  // Download & Extract inside background thread to maintain smooth scroller FPS
-  std::thread([packageIndex, version, wVer]() {
+  // Execute installation workflow in background thread using core PackageManager
+  std::thread([packageIndex, version]() {
     auto* provider = m_providers[packageIndex].get();
-    auto url = provider->GetDownloadUrl(version);
-    auto destinationDir = m_manifest->GetInstallationRootDirectory() / provider->GetIdentifier();
-    auto tempArchive = m_manifest->GetInstallationRootDirectory() / ("temp_" + provider->GetArchiveFilename(version));
-
-    std::wstring displayName = Utils::ToWString(provider->GetDisplayName());
-
-    // Thread-safe log reporting via window messages
-    PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(new std::wstring(L"--------------------------------------------------")));
-    PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(
-                    new std::wstring(std::format(L"Installation target: {} (Version: {})", displayName, wVer))));
-    PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(new std::wstring(L"Source URL: " + Utils::ToWString(url))));
-
-    std::filesystem::create_directories(m_manifest->GetInstallationRootDirectory());
-
-    auto httpClient = HttpClientFactory::CreateDefaultClient();
+    PackageManager packageManager(*m_manifest);
 
     // Safe progress throttle tracker to avoid log buffer overflow
     struct DownloadProgressTracker {
@@ -556,68 +581,34 @@ void DesktopUserInterface::TriggerInstallation() {
     };
     auto tracker = std::make_shared<DownloadProgressTracker>();
 
-    bool const downloadSuccess = httpClient->DownloadFile(url, tempArchive, [tracker](float progress) {
-      int percent = static_cast<int>(progress * 100.0F);
-      if (percent >= tracker->lastLoggedPercent + 10 || percent == 100) {
-        tracker->lastLoggedPercent = percent / 10 * 10;
-        std::wstring const progressLog = std::format(L"Binaries download progress: {}%", percent);
-        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(progressLog)));
-      }
-      std::wstring const text = std::format(L"Status: Downloading package binaries... {:.1f}%", progress * 100.0F);
-      SetWindowTextW(m_statusStatusBar, text.c_str());
-    });
+    bool const installSuccess = packageManager.InstallPackage(
+        *provider, version,
+        // Progress Callback:
+        [tracker](float progress) {
+          int percent = static_cast<int>(progress * 100.0F);
+          if (percent >= tracker->lastLoggedPercent + 10 || percent == 100) {
+            tracker->lastLoggedPercent = percent / 10 * 10;
+            std::wstring const progressLog = std::format(L"Binaries download progress: {}%", percent);
+            PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(progressLog)));
+          }
+          std::wstring const text = std::format(L"Status: Downloading package binaries... {:.1f}%", progress * 100.0F);
+          SetWindowTextW(m_statusStatusBar, text.c_str());
+        },
+        // Log Callback:
+        [](const std::string& message) {
+          PostMessage(m_mainWindow, WM_APP + 1, 0,
+                      reinterpret_cast<LPARAM>(new std::wstring(Utils::ToWString(message))));
+        });
 
-    if (downloadSuccess) {
-      PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(new std::wstring(L"Download completed successfully.")));
-      PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(new std::wstring(L"Extracting files using native tar.exe...")));
-
-      SetWindowTextW(m_statusStatusBar, L"Status: Extracting compressed archive files...");
-      std::filesystem::create_directories(destinationDir);
-
-      std::vector<std::string> const extractionCommand = {"tar.exe", "-xf", tempArchive.string(), "-C",
-                                                          destinationDir.string()};
-
-      auto extractionResult = ProcessExecutor::ExecuteCommand(extractionCommand);
-      std::filesystem::remove(tempArchive); // Cleanup temp zip file
-
-      if (extractionResult.has_value() && extractionResult->exitCode == 0) {
-        InstalledPackageState state;
-        state.identifier = provider->GetIdentifier();
-        state.installedVersion = version;
-        state.installationPath = destinationDir;
-
-        // Fetch current formatted date
-        auto now = std::chrono::system_clock::now();
-        std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-        std::tm timeStruct = *std::localtime(&nowTime);
-        state.installationDate =
-            std::format("{:04}-{:02}-{:02}", timeStruct.tm_year + 1900, timeStruct.tm_mon + 1, timeStruct.tm_mday);
-
-        m_manifest->RegisterOrUpdateInstalledPackage(state);
-
-        PostMessage(m_mainWindow, WM_APP + 1, 0, reinterpret_cast<LPARAM>(new std::wstring(L"Extraction complete.")));
-        PostMessage(
-            m_mainWindow, WM_APP + 1, 0,
-            reinterpret_cast<LPARAM>(new std::wstring(std::format(
-                L"Success: {} successfully installed at {}", displayName, Utils::ToWString(destinationDir.string())))));
-        SetWindowTextW(m_statusStatusBar, L"Status: Installation completed and registered successfully!");
-      } else {
-        PostMessage(m_mainWindow, WM_APP + 1, 0,
-                    reinterpret_cast<LPARAM>(
-                        new std::wstring(L"ERROR: Archive extraction failed (tar.exe exit code non-zero).")));
-        SetWindowTextW(m_statusStatusBar, L"Status: Extraction failed. Archive file might be corrupted.");
-      }
+    if (installSuccess) {
+      SetWindowTextW(m_statusStatusBar, L"Status: Installation completed and registered successfully!");
     } else {
-      PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Download request failed.")));
-      SetWindowTextW(m_statusStatusBar, L"Status: Network error. Binaries download failed.");
+      SetWindowTextW(m_statusStatusBar, L"Status: Installation/Extraction failed.");
     }
 
-    // Reset controls state
+    // Reset controls state and trigger list refresh
     EnableWindow(m_installButton, TRUE);
-    SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3002, 0), 0); // Trigger list refresh
+    SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3002, 0), 0);
   }).detach();
 }
 
@@ -655,53 +646,31 @@ void DesktopUserInterface::TriggerUninstallation() {
   }
 
   auto* provider = m_providers[packageIndex].get();
-  auto packageId = provider->GetIdentifier();
-  std::wstring const displayName = Utils::ToWString(provider->GetDisplayName());
+  auto const packageId = provider->GetIdentifier();
 
   // Disable buttons during action
+  m_isExecutingBackgroundAction = true;
   EnableWindow(m_installButton, FALSE);
   EnableWindow(m_uninstallButton, FALSE);
+  EnableWindow(m_packageListView, FALSE);
+  EnableWindow(m_changePathButton, FALSE);
+  EnableWindow(m_versionComboBox, FALSE);
   SetWindowTextW(m_statusStatusBar, L"Status: Starting uninstall sequence...");
 
-  // Run uninstallation on background thread
-  std::thread([packageIndex, packageId, displayName]() {
-    PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(new std::wstring(L"--------------------------------------------------")));
-    PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(new std::wstring(std::format(L"Uninstallation target: {}", displayName))));
+  // Run uninstallation on background thread using core PackageManager
+  std::thread([packageId]() {
+    PackageManager packageManager(*m_manifest);
+    bool const uninstallSuccess = packageManager.UninstallPackage(
+        packageId,
+        // Log Callback:
+        [](const std::string& message) {
+          PostMessage(m_mainWindow, WM_APP + 1, 0,
+                      reinterpret_cast<LPARAM>(new std::wstring(Utils::ToWString(message))));
+        });
 
-    auto packageState = m_manifest->GetInstalledPackageByIdentifier(packageId);
-    if (!packageState.has_value()) {
-      PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Package is not registered as installed.")));
-      SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation failed.");
-
-      // Re-enable controls via message 3002
-      SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3002, 0), 0);
-      return;
-    }
-
-    std::wstring const installPathStr = Utils::ToWString(packageState->installationPath.string());
-    PostMessage(m_mainWindow, WM_APP + 1, 0,
-                reinterpret_cast<LPARAM>(new std::wstring(L"Removing installation files at: " + installPathStr)));
-
-    try {
-      if (std::filesystem::exists(packageState->installationPath)) {
-        std::filesystem::remove_all(packageState->installationPath);
-      }
-
-      m_manifest->UnregisterInstalledPackage(packageId);
-
-      PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(new std::wstring(L"Files removed successfully.")));
-      PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(
-                      new std::wstring(std::format(L"Success: {} uninstalled successfully.", displayName))));
+    if (uninstallSuccess) {
       SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation completed successfully!");
-    } catch (const std::exception& ex) {
-      std::wstring const errorMsg = Utils::ToWString(ex.what());
-      PostMessage(m_mainWindow, WM_APP + 1, 0,
-                  reinterpret_cast<LPARAM>(new std::wstring(L"ERROR: Failed to uninstall package: " + errorMsg)));
+    } else {
       SetWindowTextW(m_statusStatusBar, L"Status: Uninstallation failed.");
     }
 
@@ -775,17 +744,35 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
 
     // Threading Messages
     if (commandId == 3001) { // Asynchronous versions query callback completed
+      int const responsePackageIndex = static_cast<int>(HIWORD(wparam));
+      auto* provider = m_providers[responsePackageIndex].get();
+      auto const packageId = provider->GetIdentifier();
+
       // Wrap in std::unique_ptr to ensure the heap-allocated vector is cleaned up automatically
       std::unique_ptr<std::vector<PackageVersion>> const versions(
           reinterpret_cast<std::vector<PackageVersion>*>(lparam));
-      for (const auto& v : *versions) {
-        std::wstring const wVersion = Utils::ToWString(v);
-        SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
+
+      // 1. Remove from pending and cache the versions (so the background refresh is saved!)
+      m_pendingVersionQueries.erase(packageId);
+      m_versionsCache[packageId] = *versions;
+
+      // 2. If it is still the currently selected package, update the UI
+      if (responsePackageIndex == m_selectedPackageIndex) {
+        SendMessage(m_versionComboBox, CB_RESETCONTENT, 0, 0);
+        for (const auto& v : *versions) {
+          std::wstring const wVersion = Utils::ToWString(v);
+          SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
+        }
+        SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
+
+        if (!m_isExecutingBackgroundAction) {
+          EnableWindow(m_installButton, TRUE);
+          SetWindowTextW(m_statusStatusBar, L"Status: Versions registry updated.");
+        }
+        AppendLog(L"Loaded available versions list successfully.");
+      } else {
+        AppendLog(L"Cached background versions list for " + Utils::ToWString(provider->GetDisplayName()) + L".");
       }
-      SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
-      EnableWindow(m_installButton, TRUE);
-      SetWindowTextW(m_statusStatusBar, L"Status: Versions registry updated.");
-      AppendLog(L"Loaded available versions list successfully.");
     } else if (commandId == 3002) { // Refresh package listings
       RefreshInstalledList();
     }

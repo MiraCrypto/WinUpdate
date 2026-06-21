@@ -1,5 +1,7 @@
 #pragma once
+#include <filesystem>
 #include <string>
+#include <vector>
 
 namespace CatUpdate {
 
@@ -23,6 +25,12 @@ public:
    * ".tar.gz").
    */
   static std::string GetArchiveExtension();
+
+  /**
+   * Returns the command line argument vector required to extract a compressed archive to a target directory.
+   */
+  static std::vector<std::string> GetExtractionCommand(const std::filesystem::path& archivePath,
+                                                       const std::filesystem::path& destinationDirectory);
 };
 
 } // namespace CatUpdate

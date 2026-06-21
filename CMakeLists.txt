@@ -30,6 +30,7 @@ endif()
 # =============================================================================
 add_library(catupdate-core STATIC
     src/CatUpdateCore.cpp
+    src/PackageManager.cpp
     src/Providers.cpp
 )
 

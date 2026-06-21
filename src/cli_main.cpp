@@ -1,6 +1,7 @@
 #include "CatUpdateCore.hpp"
 #include "Cli.hpp"
 #include "HttpClient.hpp"
+#include "PackageManager.hpp"
 #include "ProcessExecutor.hpp"
 #include "Providers.hpp"
 #include <algorithm>
@@ -210,92 +211,39 @@ int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, co
     targetVersion = versions[0];
   }
 
-  const UrlString downloadUrl = provider->GetDownloadUrl(targetVersion);
-  const std::string archiveName = provider->GetArchiveFilename(targetVersion);
-  const std::filesystem::path tempArchiveFile = manifest.GetInstallationRootDirectory() / ("temp_" + archiveName);
-  const std::filesystem::path targetInstallationDir =
-      manifest.GetInstallationRootDirectory() / provider->GetIdentifier();
-
   std::cout << COLOR_CYAN << std::format("Installing {} (Version: {})", provider->GetDisplayName(), targetVersion)
             << COLOR_RESET << '\n';
-  std::cout << "Download URL: " << downloadUrl << '\n';
 
-  // Ensure parent directories exist
-  std::filesystem::create_directories(manifest.GetInstallationRootDirectory());
+  PackageManager packageManager(manifest);
+  bool const success = packageManager.InstallPackage(
+      *provider, targetVersion,
+      // Progress Callback:
+      [](float progress) {
+        std::cout << "\r[";
+        const int pos = static_cast<int>(40.0F * progress);
+        for (int i = 0; i < 40; ++i) {
+          if (i < pos) {
+            std::cout << "=";
+          } else if (i == pos) {
+            std::cout << ">";
+          } else {
+            std::cout << " ";
+          }
+        }
+        std::cout << "] " << static_cast<int>(progress * 100.0F) << " %" << std::flush;
+      },
+      // Log Callback:
+      [](const std::string& message) {
+        if (message.starts_with("ERROR:")) {
+          std::cerr << '\n' << COLOR_RED << message << COLOR_RESET << '\n';
+        } else if (message.starts_with("Success:")) {
+          std::cout << '\n' << COLOR_GREEN << message << COLOR_RESET << '\n';
+        } else {
+          std::cout << message << '\n';
+        }
+      });
 
-  // Download File
-  const bool downloadSuccess = httpClient->DownloadFile(downloadUrl, tempArchiveFile, [](float progress) {
-    std::cout << "\r[";
-    const int pos = static_cast<int>(40.0F * progress);
-    for (int i = 0; i < 40; ++i) {
-      if (i < pos) {
-        std::cout << "=";
-      } else if (i == pos) {
-        std::cout << ">";
-      } else {
-        std::cout << " ";
-      }
-    }
-    std::cout << "] " << static_cast<int>(progress * 100.0F) << " %" << std::flush;
-  });
-  std::cout << '\n';
-
-  if (!downloadSuccess) {
-    std::cerr << COLOR_RED << "Error: Download failed." << COLOR_RESET << '\n';
-    if (std::filesystem::exists(tempArchiveFile)) {
-      std::filesystem::remove(tempArchiveFile);
-    }
-    return 1;
-  }
-
-  // Perform Extraction
-  std::cout << COLOR_CYAN << "Extracting package files..." << COLOR_RESET << '\n';
-  std::filesystem::create_directories(targetInstallationDir);
-
-  // Construct clean, robust command line for extraction based on extension
-  std::vector<std::string> extractionCommand;
-#ifdef _WIN32
-  // On Windows, built-in tar.exe handles zip, 7z, tar.xz etc. flawlessly.
-  extractionCommand = {"tar.exe", "-xf", tempArchiveFile.string(), "-C", targetInstallationDir.string()};
-#else
-  if (tempArchiveFile.extension() == ".zip") {
-    extractionCommand = {"unzip", "-q", "-o", tempArchiveFile.string(), "-d", targetInstallationDir.string()};
-  } else {
-    // tar handles gz, xz on Unix
-    extractionCommand = {"tar", "-xf", tempArchiveFile.string(), "-C", targetInstallationDir.string()};
-  }
-#endif
-
-  auto extractionResult = ProcessExecutor::ExecuteCommand(extractionCommand);
-  std::filesystem::remove(tempArchiveFile); // Cleanup downloaded archive
-
-  if (!extractionResult.has_value() || extractionResult->exitCode != 0) {
-    std::cerr << COLOR_RED << "Error: Extraction failed." << COLOR_RESET << '\n';
-    if (extractionResult.has_value()) {
-      std::cerr << "Details: " << extractionResult->standardOutput << '\n';
-    }
-    return 1;
-  }
-
-  // Track in manifest
-  InstalledPackageState state;
-  state.identifier = provider->GetIdentifier();
-  state.installedVersion = targetVersion;
-  state.installationPath = targetInstallationDir;
-
-  // Get current date
-  auto now = std::chrono::system_clock::now();
-  std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-  std::tm timeStruct = *std::localtime(&nowTime);
-  state.installationDate =
-      std::format("{:04}-{:02}-{:02}", timeStruct.tm_year + 1900, timeStruct.tm_mon + 1, timeStruct.tm_mday);
-
-  manifest.RegisterOrUpdateInstalledPackage(state);
-
-  std::cout << COLOR_GREEN << "Installation of " << provider->GetDisplayName() << " completed successfully!"
-            << COLOR_RESET << '\n';
-  std::cout << "Path: " << targetInstallationDir.string() << '\n';
-  return 0;
+  return success ? 0 : 1;
 }
 
 int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, const std::string& versionOverride) {
@@ -368,29 +316,20 @@ int CommandLineInterface::ExecuteUninstallCommand(const std::string& packageId) 
   auto rootPath = PathResolver::GetDefaultInstallationRootPath();
   ManifestManager manifest(rootPath);
 
-  auto packageState = manifest.GetInstalledPackageByIdentifier(packageId);
-  if (!packageState.has_value()) {
-    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not registered as installed." << COLOR_RESET
-              << '\n';
-    return 1;
-  }
+  PackageManager packageManager(manifest);
+  bool const success = packageManager.UninstallPackage(packageId,
+                                                       // Log Callback:
+                                                       [](const std::string& message) {
+                                                         if (message.starts_with("ERROR:")) {
+                                                           std::cerr << COLOR_RED << message << COLOR_RESET << '\n';
+                                                         } else if (message.starts_with("Success:")) {
+                                                           std::cout << COLOR_GREEN << message << COLOR_RESET << '\n';
+                                                         } else {
+                                                           std::cout << message << '\n';
+                                                         }
+                                                       });
 
-  std::cout << COLOR_CYAN << "Uninstalling package at " << packageState->installationPath.string() << "..."
-            << COLOR_RESET << '\n';
-
-  try {
-    if (std::filesystem::exists(packageState->installationPath)) {
-      std::filesystem::remove_all(packageState->installationPath);
-    }
-
-    manifest.UnregisterInstalledPackage(packageId);
-
-    std::cout << COLOR_GREEN << "Uninstall completed successfully!" << COLOR_RESET << '\n';
-    return 0;
-  } catch (const std::exception& ex) {
-    std::cerr << COLOR_RED << "Error during uninstall: " << ex.what() << COLOR_RESET << '\n';
-    return 1;
-  }
+  return success ? 0 : 1;
 }
 
 int CommandLineInterface::ExecutePathCommand(const std::vector<std::string>& pathArguments) {
@@ -423,7 +362,10 @@ int CommandLineInterface::ExecutePathCommand(const std::vector<std::string>& pat
 } // namespace CatUpdate
 
 #if defined(_WIN32) && defined(UNICODE)
-int wmain(int argc, wchar_t* argv[]) noexcept { // NOLINT(misc-use-internal-linkage,readability-identifier-naming,cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
+int wmain(
+    int argc,
+    wchar_t* argv
+        []) noexcept { // NOLINT(misc-use-internal-linkage,readability-identifier-naming,cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
   try {
     std::vector<std::string> args;
     args.reserve(argc);

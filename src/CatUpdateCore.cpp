@@ -154,5 +154,4 @@ bool ManifestManager::IsPackageInstalled(const PackageIdentifier& packageIdentif
 std::vector<InstalledPackageState> ManifestManager::GetInstalledPackages() const {
   return m_installedPackages;
 }
-
 } // namespace CatUpdate
