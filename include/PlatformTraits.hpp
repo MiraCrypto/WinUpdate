@@ -19,17 +19,21 @@ public:
    * "darwin-x64").
    */
   static std::string GetPlatformNameString();
+  static std::string GetPlatformNameString(PlatformType platform);
 
   /**
    * Returns the default compressed package extension for the host (e.g. ".zip", ".tar.xz",
    * ".tar.gz").
    */
   static std::string GetArchiveExtension();
+  static std::string GetArchiveExtension(PlatformType platform);
 
   /**
    * Returns the command line argument vector required to extract a compressed archive to a target directory.
    */
   static std::vector<std::string> GetExtractionCommand(const std::filesystem::path& archivePath,
+                                                       const std::filesystem::path& destinationDirectory);
+  static std::vector<std::string> GetExtractionCommand(PlatformType platform, const std::filesystem::path& archivePath,
                                                        const std::filesystem::path& destinationDirectory);
 };
 

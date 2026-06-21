@@ -92,35 +92,25 @@ TEST(UtilsTest, WideStringConversions) {
   ASSERT_TRUE(originalUtf8 == roundTripUtf8);
 }
 
-TEST(PlatformTraitsTest, GetPlatformProperties) {
-  auto type = PlatformTraits::GetPlatformType();
-  auto name = PlatformTraits::GetPlatformNameString();
-  auto ext = PlatformTraits::GetArchiveExtension();
+TEST(PlatformTraitsTest, GetPlatformPropertiesStatic) {
+  // Test Windows properties
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::Windows) == "win-x64");
+  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::Windows) == ".zip");
 
-  ASSERT_FALSE(name.empty());
-  ASSERT_FALSE(ext.empty());
+  // Test macOS properties
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::macOS) == "darwin-x64");
+  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::macOS) == ".tar.gz");
 
-#ifdef _WIN32
-  ASSERT_TRUE(type == PlatformType::Windows);
-  ASSERT_TRUE(name == "win-x64");
-  ASSERT_TRUE(ext == ".zip");
-#elif defined(__APPLE__)
-  ASSERT_TRUE(type == PlatformType::macOS);
-  ASSERT_TRUE(name == "darwin-x64");
-  ASSERT_TRUE(ext == ".tar.gz");
-#else
-  ASSERT_TRUE(type == PlatformType::Linux);
-  ASSERT_TRUE(name == "linux-x64");
-  ASSERT_TRUE(ext == ".tar.xz");
-#endif
+  // Test Linux properties
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::Linux) == "linux-x64");
+  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::Linux) == ".tar.xz");
 }
 
-#ifdef _WIN32
 TEST(PlatformTraitsTest, GetWindowsExtractionCommand) {
   const std::filesystem::path archive = "test_archive.zip";
   const std::filesystem::path dest = "test_destination";
 
-  auto cmd = PlatformTraits::GetExtractionCommand(archive, dest);
+  auto cmd = PlatformTraits::GetExtractionCommand(PlatformType::Windows, archive, dest);
   ASSERT_FALSE(cmd.empty());
   ASSERT_TRUE(cmd.size() == 5);
   ASSERT_TRUE(cmd[0] == "tar.exe");
@@ -129,12 +119,12 @@ TEST(PlatformTraitsTest, GetWindowsExtractionCommand) {
   ASSERT_TRUE(cmd[3] == "-C");
   ASSERT_TRUE(cmd[4] == dest.string());
 }
-#else
+
 TEST(PlatformTraitsTest, GetPosixZipExtractionCommand) {
   const std::filesystem::path archive = "test_archive.zip";
   const std::filesystem::path dest = "test_destination";
 
-  auto cmd = PlatformTraits::GetExtractionCommand(archive, dest);
+  auto cmd = PlatformTraits::GetExtractionCommand(PlatformType::macOS, archive, dest);
   ASSERT_FALSE(cmd.empty());
   ASSERT_TRUE(cmd.size() == 6);
   ASSERT_TRUE(cmd[0] == "unzip");
@@ -149,7 +139,7 @@ TEST(PlatformTraitsTest, GetPosixTarExtractionCommand) {
   const std::filesystem::path archive = "test_archive.tar.gz";
   const std::filesystem::path dest = "test_destination";
 
-  auto cmd = PlatformTraits::GetExtractionCommand(archive, dest);
+  auto cmd = PlatformTraits::GetExtractionCommand(PlatformType::macOS, archive, dest);
   ASSERT_FALSE(cmd.empty());
   ASSERT_TRUE(cmd.size() == 5);
   ASSERT_TRUE(cmd[0] == "tar");
@@ -158,6 +148,14 @@ TEST(PlatformTraitsTest, GetPosixTarExtractionCommand) {
   ASSERT_TRUE(cmd[3] == "-C");
   ASSERT_TRUE(cmd[4] == dest.string());
 }
-#endif
+
+TEST(PlatformTraitsTest, ActivePlatformPropertiesMatch) {
+  auto type = PlatformTraits::GetPlatformType();
+  auto name = PlatformTraits::GetPlatformNameString();
+  auto ext = PlatformTraits::GetArchiveExtension();
+
+  ASSERT_TRUE(name == PlatformTraits::GetPlatformNameString(type));
+  ASSERT_TRUE(ext == PlatformTraits::GetArchiveExtension(type));
+}
 
 } // namespace CatUpdate
