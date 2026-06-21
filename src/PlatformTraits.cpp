@@ -2,25 +2,45 @@
 
 namespace CatUpdate {
 
+ArchitectureType PlatformTraits::GetHostArchitecture() {
+#if defined(__aarch64__) || defined(_M_ARM64)
+  return ArchitectureType::Arm64;
+#else
+  return ArchitectureType::X64;
+#endif
+}
+
 std::string PlatformTraits::GetPlatformNameString() {
-  return GetPlatformNameString(GetPlatformType());
+  return GetPlatformNameString(GetPlatformType(), GetHostArchitecture());
 }
 
 std::string PlatformTraits::GetPlatformNameString(PlatformType platform) {
+  return GetPlatformNameString(platform, GetHostArchitecture());
+}
+
+std::string PlatformTraits::GetPlatformNameString(PlatformType platform, ArchitectureType arch) {
+  std::string osStr;
   if (platform == PlatformType::Windows) {
-    return "win-x64";
+    osStr = "win";
+  } else if (platform == PlatformType::macOS) {
+    osStr = "darwin";
+  } else {
+    osStr = "linux";
   }
-  if (platform == PlatformType::macOS) {
-    return "darwin-x64";
-  }
-  return "linux-x64";
+
+  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "x64";
+  return osStr + "-" + archStr;
 }
 
 std::string PlatformTraits::GetArchiveExtension() {
-  return GetArchiveExtension(GetPlatformType());
+  return GetArchiveExtension(GetPlatformType(), GetHostArchitecture());
 }
 
 std::string PlatformTraits::GetArchiveExtension(PlatformType platform) {
+  return GetArchiveExtension(platform, GetHostArchitecture());
+}
+
+std::string PlatformTraits::GetArchiveExtension(PlatformType platform, ArchitectureType /*arch*/) {
   if (platform == PlatformType::Windows) {
     return ".zip";
   }

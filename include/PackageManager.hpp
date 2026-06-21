@@ -20,6 +20,8 @@ public:
   explicit PackageManager(ManifestManager& manifest);
 
   bool InstallPackage(PackageProvider& provider, const PackageVersion& version,
+                      PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                      ArchitectureType targetArch = PlatformTraits::GetHostArchitecture(),
                       const ProgressCallback& progressCallback = nullptr, const LogCallback& logCallback = nullptr);
 
   bool UninstallPackage(const PackageIdentifier& packageId, const LogCallback& logCallback = nullptr);

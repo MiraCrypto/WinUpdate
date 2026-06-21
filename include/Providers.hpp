@@ -1,7 +1,7 @@
 #pragma once
-
 #include "CatUpdateCore.hpp"
 #include "HttpClient.hpp"
+#include "PlatformTraits.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,9 +26,10 @@ public:
   virtual PackageName GetDisplayName() const = 0;
 
   /**
-   * Returns whether this package can be installed on the current running operating system.
+   * Returns whether this package can be installed on the requested target operating system and CPU architecture.
    */
-  virtual bool IsPlatformSupported() const = 0;
+  virtual bool IsPlatformSupported(PlatformType platform = PlatformTraits::GetPlatformType(),
+                                   ArchitectureType arch = PlatformTraits::GetHostArchitecture()) const = 0;
 
   /**
    * Fetches the list of available version tags from remote APIs.
@@ -36,14 +37,18 @@ public:
   virtual std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) = 0;
 
   /**
-   * Computes the direct download URL for a given version.
+   * Computes the direct download URL for a given version and target.
    */
-  virtual UrlString GetDownloadUrl(const PackageVersion& version) const = 0;
+  virtual UrlString GetDownloadUrl(const PackageVersion& version,
+                                   PlatformType platform = PlatformTraits::GetPlatformType(),
+                                   ArchitectureType arch = PlatformTraits::GetHostArchitecture()) const = 0;
 
   /**
-   * Computes the local archive filename for a given version.
+   * Computes the local archive filename for a given version and target.
    */
-  virtual std::string GetArchiveFilename(const PackageVersion& version) const = 0;
+  virtual std::string GetArchiveFilename(const PackageVersion& version,
+                                         PlatformType platform = PlatformTraits::GetPlatformType(),
+                                         ArchitectureType arch = PlatformTraits::GetHostArchitecture()) const = 0;
 };
 
 /**
@@ -61,10 +66,11 @@ class NodeJsPackageProvider : public BasePackageProvider {
 public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
-  bool IsPlatformSupported() const override;
+  bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
   std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-  UrlString GetDownloadUrl(const PackageVersion& version) const override;
-  std::string GetArchiveFilename(const PackageVersion& version) const override;
+  UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
+  std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                 ArchitectureType arch) const override;
 };
 
 /**
@@ -74,10 +80,11 @@ class VSCodiumPackageProvider : public BasePackageProvider {
 public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
-  bool IsPlatformSupported() const override;
+  bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
   std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-  UrlString GetDownloadUrl(const PackageVersion& version) const override;
-  std::string GetArchiveFilename(const PackageVersion& version) const override;
+  UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
+  std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                 ArchitectureType arch) const override;
 };
 
 /**
@@ -87,10 +94,11 @@ class PythonPackageProvider : public BasePackageProvider {
 public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
-  bool IsPlatformSupported() const override;
+  bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
   std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-  UrlString GetDownloadUrl(const PackageVersion& version) const override;
-  std::string GetArchiveFilename(const PackageVersion& version) const override;
+  UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
+  std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                 ArchitectureType arch) const override;
 };
 
 /**
@@ -100,10 +108,11 @@ class OpenJdkPackageProvider : public BasePackageProvider {
 public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
-  bool IsPlatformSupported() const override;
+  bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
   std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-  UrlString GetDownloadUrl(const PackageVersion& version) const override;
-  std::string GetArchiveFilename(const PackageVersion& version) const override;
+  UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
+  std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                 ArchitectureType arch) const override;
 };
 
 /**
@@ -113,10 +122,11 @@ class GitPackageProvider : public BasePackageProvider {
 public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
-  bool IsPlatformSupported() const override;
+  bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
   std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-  UrlString GetDownloadUrl(const PackageVersion& version) const override;
-  std::string GetArchiveFilename(const PackageVersion& version) const override;
+  UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
+  std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                 ArchitectureType arch) const override;
 };
 
 /**
@@ -126,14 +136,15 @@ class VimPackageProvider : public BasePackageProvider {
 public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
-  bool IsPlatformSupported() const override;
+  bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
   std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
-  UrlString GetDownloadUrl(const PackageVersion& version) const override;
-  std::string GetArchiveFilename(const PackageVersion& version) const override;
+  UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
+  std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                 ArchitectureType arch) const override;
 };
 
 /**
- * Manages and returns the collection of providers supported on the current platform.
+ * Manages and returns the collection of all package providers.
  */
 class PackageProviderRegistry {
 public:

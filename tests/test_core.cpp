@@ -1,5 +1,7 @@
 #include "CatUpdateCore.hpp"
+#include "PackageManager.hpp"
 #include "PlatformTraits.hpp"
+#include "Providers.hpp"
 #include "test_helper.hpp"
 #include <filesystem>
 #include <string>
@@ -92,18 +94,26 @@ TEST(UtilsTest, WideStringConversions) {
   ASSERT_TRUE(originalUtf8 == roundTripUtf8);
 }
 
+TEST(PlatformTraitsTest, GetHostArchitecture) {
+  auto const arch = PlatformTraits::GetHostArchitecture();
+  ASSERT_TRUE(arch == PlatformTraits::GetHostArchitecture());
+}
+
 TEST(PlatformTraitsTest, GetPlatformPropertiesStatic) {
   // Test Windows properties
-  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::Windows) == "win-x64");
-  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::Windows) == ".zip");
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::Windows, ArchitectureType::X64) == "win-x64");
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::Windows, ArchitectureType::Arm64) == "win-arm64");
+  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::Windows, ArchitectureType::X64) == ".zip");
 
   // Test macOS properties
-  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::macOS) == "darwin-x64");
-  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::macOS) == ".tar.gz");
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::macOS, ArchitectureType::X64) == "darwin-x64");
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::macOS, ArchitectureType::Arm64) == "darwin-arm64");
+  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::macOS, ArchitectureType::X64) == ".tar.gz");
 
   // Test Linux properties
-  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::Linux) == "linux-x64");
-  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::Linux) == ".tar.xz");
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::Linux, ArchitectureType::X64) == "linux-x64");
+  ASSERT_TRUE(PlatformTraits::GetPlatformNameString(PlatformType::Linux, ArchitectureType::Arm64) == "linux-arm64");
+  ASSERT_TRUE(PlatformTraits::GetArchiveExtension(PlatformType::Linux, ArchitectureType::X64) == ".tar.xz");
 }
 
 TEST(PlatformTraitsTest, GetWindowsExtractionCommand) {
@@ -151,11 +161,54 @@ TEST(PlatformTraitsTest, GetPosixTarExtractionCommand) {
 
 TEST(PlatformTraitsTest, ActivePlatformPropertiesMatch) {
   auto type = PlatformTraits::GetPlatformType();
+  auto arch = PlatformTraits::GetHostArchitecture();
   auto name = PlatformTraits::GetPlatformNameString();
   auto ext = PlatformTraits::GetArchiveExtension();
 
-  ASSERT_TRUE(name == PlatformTraits::GetPlatformNameString(type));
-  ASSERT_TRUE(ext == PlatformTraits::GetArchiveExtension(type));
+  ASSERT_TRUE(name == PlatformTraits::GetPlatformNameString(type, arch));
+  ASSERT_TRUE(ext == PlatformTraits::GetArchiveExtension(type, arch));
+}
+
+TEST(PackageManagerTest, PlatformConflictLockout) {
+  const std::filesystem::path sandboxDir = std::filesystem::current_path() / "test_sandbox";
+  std::filesystem::create_directories(sandboxDir);
+
+  // Cleanup sandbox from previous runs if any
+  const std::filesystem::path manifestFilePath = sandboxDir / "catupdate.json";
+  if (std::filesystem::exists(manifestFilePath)) {
+    std::filesystem::remove(manifestFilePath);
+  }
+
+  {
+    ManifestManager manifest(sandboxDir);
+    PackageManager packageManager(manifest);
+    NodeJsPackageProvider provider;
+
+    // Register an active installation of nodejs targeting macos-x64
+    InstalledPackageState state;
+    state.identifier = "nodejs";
+    state.targetPlatform = "macos";
+    state.targetArchitecture = "x64";
+    state.installedVersion = "20.11.1";
+    state.installationPath = sandboxDir / "nodejs";
+    state.installationDate = "2026-06-21";
+
+    manifest.RegisterOrUpdateInstalledPackage(state);
+    ASSERT_TRUE(manifest.IsPackageInstalled("nodejs"));
+
+    // Attempt to install nodejs targeting Windows x64 -> should be BLOCKED (return false)
+    bool const winInstallStatus =
+        packageManager.InstallPackage(provider, "20.11.1", PlatformType::Windows, ArchitectureType::X64);
+    ASSERT_FALSE(winInstallStatus);
+
+    // Attempt to install nodejs targeting macOS ARM64 -> should be BLOCKED (return false)
+    bool const armInstallStatus =
+        packageManager.InstallPackage(provider, "20.11.1", PlatformType::macOS, ArchitectureType::Arm64);
+    ASSERT_FALSE(armInstallStatus);
+  }
+
+  // Clean up sandbox
+  std::filesystem::remove_all(sandboxDir);
 }
 
 } // namespace CatUpdate

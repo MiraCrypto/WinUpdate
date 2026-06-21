@@ -14,8 +14,8 @@
 namespace CatUpdate {
 
 namespace {
-std::string GetOsQueryString() {
-  switch (PlatformTraits::GetPlatformType()) {
+std::string GetOsQueryString(PlatformType platform) {
+  switch (platform) {
   case PlatformType::Windows:
     return "windows";
   case PlatformType::macOS:
@@ -48,8 +48,8 @@ PackageName NodeJsPackageProvider::GetDisplayName() const {
   return "Node.js (LTS)";
 }
 
-bool NodeJsPackageProvider::IsPlatformSupported() const {
-  return true; // Supported on all major platforms
+bool NodeJsPackageProvider::IsPlatformSupported(PlatformType /*platform*/, ArchitectureType /*arch*/) const {
+  return true;
 }
 
 std::vector<PackageVersion> NodeJsPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
@@ -62,25 +62,33 @@ std::vector<PackageVersion> NodeJsPackageProvider::FetchAvailableVersions(HttpCl
   try {
     auto parsedData = nlohmann::json::parse(rawJson);
     for (const auto& item : parsedData) {
-      // Restrict to LTS versions only
-      if (item.contains("lts") && item["lts"].is_string()) {
-        versions.push_back(item.value("version", ""));
-      }
+      versions.push_back(item.value("version", ""));
     }
   } catch (const std::exception& ex) {
-    SystemLogger::LogError("Exception parsing Node.js versions JSON", ex.what());
+    SystemLogger::LogError("Exception parsing Node.js releases JSON", ex.what());
   }
   return versions;
 }
 
-UrlString NodeJsPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-  return std::format("https://nodejs.org/dist/{0}/node-{0}-{1}{2}", version, PlatformTraits::GetPlatformNameString(),
-                     PlatformTraits::GetArchiveExtension());
+UrlString NodeJsPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType platform,
+                                                ArchitectureType arch) const {
+  return std::format("https://nodejs.org/dist/{}/{}", version, GetArchiveFilename(version, platform, arch));
 }
 
-std::string NodeJsPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-  return std::format("node-{}-{}{}", version, PlatformTraits::GetPlatformNameString(),
-                     PlatformTraits::GetArchiveExtension());
+std::string NodeJsPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                                      ArchitectureType arch) const {
+  std::string osStr;
+  if (platform == PlatformType::Windows) {
+    osStr = "win";
+  } else if (platform == PlatformType::macOS) {
+    osStr = "darwin";
+  } else {
+    osStr = "linux";
+  }
+
+  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "x64";
+  std::string const ext = PlatformTraits::GetArchiveExtension(platform, arch);
+  return std::format("node-{}-{}-{}{}", version, osStr, archStr, ext);
 }
 
 // -----------------------------------------------------------------------------
@@ -95,8 +103,8 @@ PackageName VSCodiumPackageProvider::GetDisplayName() const {
   return "VSCodium";
 }
 
-bool VSCodiumPackageProvider::IsPlatformSupported() const {
-  return true; // Supported on all major platforms
+bool VSCodiumPackageProvider::IsPlatformSupported(PlatformType /*platform*/, ArchitectureType /*arch*/) const {
+  return true;
 }
 
 std::vector<PackageVersion> VSCodiumPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
@@ -117,19 +125,21 @@ std::vector<PackageVersion> VSCodiumPackageProvider::FetchAvailableVersions(Http
   return versions;
 }
 
-UrlString VSCodiumPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-  std::string platformName = (PlatformTraits::GetPlatformType() == PlatformType::Windows)
-                                 ? "win32-x64"
-                                 : PlatformTraits::GetPlatformNameString();
+UrlString VSCodiumPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType platform,
+                                                  ArchitectureType arch) const {
+  std::string const platformName = (platform == PlatformType::Windows)
+                                       ? ("win32-" + std::string(arch == ArchitectureType::Arm64 ? "arm64" : "x64"))
+                                       : PlatformTraits::GetPlatformNameString(platform, arch);
   return std::format("https://github.com/VSCodium/vscodium/releases/download/{0}/VSCodium-{1}-{0}{2}", version,
-                     platformName, PlatformTraits::GetArchiveExtension());
+                     platformName, PlatformTraits::GetArchiveExtension(platform, arch));
 }
 
-std::string VSCodiumPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-  std::string platformName = (PlatformTraits::GetPlatformType() == PlatformType::Windows)
-                                 ? "win32-x64"
-                                 : PlatformTraits::GetPlatformNameString();
-  return std::format("VSCodium-{}-{}{}", platformName, version, PlatformTraits::GetArchiveExtension());
+std::string VSCodiumPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                                        ArchitectureType arch) const {
+  std::string const platformName = (platform == PlatformType::Windows)
+                                       ? ("win32-" + std::string(arch == ArchitectureType::Arm64 ? "arm64" : "x64"))
+                                       : PlatformTraits::GetPlatformNameString(platform, arch);
+  return std::format("VSCodium-{}-{}{}", platformName, version, PlatformTraits::GetArchiveExtension(platform, arch));
 }
 
 // -----------------------------------------------------------------------------
@@ -144,20 +154,24 @@ PackageName PythonPackageProvider::GetDisplayName() const {
   return "Python (Embeddable)";
 }
 
-bool PythonPackageProvider::IsPlatformSupported() const {
-  return PlatformTraits::GetPlatformType() == PlatformType::Windows;
+bool PythonPackageProvider::IsPlatformSupported(PlatformType platform, ArchitectureType /*arch*/) const {
+  return platform == PlatformType::Windows;
 }
 
 std::vector<PackageVersion> PythonPackageProvider::FetchAvailableVersions(HttpClient& /*httpClient*/) {
   return {"3.12.3", "3.11.9", "3.10.11"};
 }
 
-UrlString PythonPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-  return std::format("https://www.python.org/ftp/python/{0}/python-{0}-embed-amd64.zip", version);
+UrlString PythonPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType /*platform*/,
+                                                ArchitectureType arch) const {
+  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "amd64";
+  return std::format("https://www.python.org/ftp/python/{0}/python-{0}-embed-{1}.zip", version, archStr);
 }
 
-std::string PythonPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-  return std::format("python-{}-embed-amd64.zip", version);
+std::string PythonPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType /*platform*/,
+                                                      ArchitectureType arch) const {
+  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "amd64";
+  return std::format("python-{}-embed-{}.zip", version, archStr);
 }
 
 // -----------------------------------------------------------------------------
@@ -172,13 +186,13 @@ PackageName OpenJdkPackageProvider::GetDisplayName() const {
   return "OpenJDK (Temurin)";
 }
 
-bool OpenJdkPackageProvider::IsPlatformSupported() const {
+bool OpenJdkPackageProvider::IsPlatformSupported(PlatformType /*platform*/, ArchitectureType /*arch*/) const {
   return true;
 }
 
 std::vector<PackageVersion> OpenJdkPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
   std::vector<PackageVersion> versions;
-  const std::string osQuery = GetOsQueryString();
+  const std::string osQuery = GetOsQueryString(PlatformTraits::GetPlatformType());
 
   const std::string queryUrl = std::format("https://api.adoptium.net/v3/info/"
                                            "release_names?project=jdk&vendor=eclipse&heap_size=normal&"
@@ -203,14 +217,18 @@ std::vector<PackageVersion> OpenJdkPackageProvider::FetchAvailableVersions(HttpC
   return versions;
 }
 
-UrlString OpenJdkPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
-  const std::string osQuery = GetOsQueryString();
-  return std::format("https://api.adoptium.net/v3/binary/version/{0}/{1}/x64/jdk/hotspot/normal/eclipse", version,
-                     osQuery);
+UrlString OpenJdkPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType platform,
+                                                 ArchitectureType arch) const {
+  const std::string osQuery = GetOsQueryString(platform);
+  const std::string archQuery = (arch == ArchitectureType::Arm64) ? "aarch64" : "x64";
+  return std::format("https://api.adoptium.net/v3/binary/version/{0}/{1}/{2}/jdk/hotspot/normal/eclipse", version,
+                     osQuery, archQuery);
 }
 
-std::string OpenJdkPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-  return std::format("openjdk-{}-x64.zip", version);
+std::string OpenJdkPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType /*platform*/,
+                                                       ArchitectureType arch) const {
+  const std::string archStr = (arch == ArchitectureType::Arm64) ? "aarch64" : "x64";
+  return std::format("openjdk-{}-{}.zip", version, archStr);
 }
 
 // -----------------------------------------------------------------------------
@@ -225,8 +243,8 @@ PackageName GitPackageProvider::GetDisplayName() const {
   return "Git for Windows (Portable)";
 }
 
-bool GitPackageProvider::IsPlatformSupported() const {
-  return PlatformTraits::GetPlatformType() == PlatformType::Windows;
+bool GitPackageProvider::IsPlatformSupported(PlatformType platform, ArchitectureType /*arch*/) const {
+  return platform == PlatformType::Windows;
 }
 
 std::vector<PackageVersion> GitPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
@@ -247,7 +265,8 @@ std::vector<PackageVersion> GitPackageProvider::FetchAvailableVersions(HttpClien
   return versions;
 }
 
-UrlString GitPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
+UrlString GitPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType /*platform*/,
+                                             ArchitectureType arch) const {
   std::string sanitizedVersion = version;
   if (sanitizedVersion.starts_with("v")) {
     sanitizedVersion = sanitizedVersion.substr(1);
@@ -256,12 +275,15 @@ UrlString GitPackageProvider::GetDownloadUrl(const PackageVersion& version) cons
   if (winSuffixIndex != std::string::npos) {
     sanitizedVersion = sanitizedVersion.substr(0, winSuffixIndex);
   }
-  return std::format("https://github.com/git-for-windows/git/releases/download/{0}/PortableGit-{1}-64-bit.7z.exe",
-                     version, sanitizedVersion);
+  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "64-bit";
+  return std::format("https://github.com/git-for-windows/git/releases/download/{0}/PortableGit-{1}-{2}.7z.exe", version,
+                     sanitizedVersion, archStr);
 }
 
-std::string GitPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-  return std::format("PortableGit-{}-64-bit.exe", version);
+std::string GitPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType /*platform*/,
+                                                   ArchitectureType arch) const {
+  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "64-bit";
+  return std::format("PortableGit-{}-{}.exe", version, archStr);
 }
 
 // -----------------------------------------------------------------------------
@@ -276,8 +298,8 @@ PackageName VimPackageProvider::GetDisplayName() const {
   return "Vim (Portable)";
 }
 
-bool VimPackageProvider::IsPlatformSupported() const {
-  return PlatformTraits::GetPlatformType() == PlatformType::Windows;
+bool VimPackageProvider::IsPlatformSupported(PlatformType platform, ArchitectureType /*arch*/) const {
+  return platform == PlatformType::Windows;
 }
 
 std::vector<PackageVersion> VimPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
@@ -299,17 +321,21 @@ std::vector<PackageVersion> VimPackageProvider::FetchAvailableVersions(HttpClien
   return versions;
 }
 
-UrlString VimPackageProvider::GetDownloadUrl(const PackageVersion& version) const {
+UrlString VimPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType /*platform*/,
+                                             ArchitectureType arch) const {
   std::string sanitizedVersion = version;
   if (sanitizedVersion.starts_with("v")) {
     sanitizedVersion = sanitizedVersion.substr(1);
   }
-  return std::format("https://github.com/vim/vim-win32-installer/releases/download/{0}/gvim_{1}_x64.zip", version,
-                     sanitizedVersion);
+  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "x64";
+  return std::format("https://github.com/vim/vim-win32-installer/releases/download/{0}/gvim_{1}_{2}.zip", version,
+                     sanitizedVersion, archStr);
 }
 
-std::string VimPackageProvider::GetArchiveFilename(const PackageVersion& version) const {
-  return std::format("gvim_{}_x64.zip", version);
+std::string VimPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType /*platform*/,
+                                                   ArchitectureType arch) const {
+  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "x64";
+  return std::format("gvim_{}_{}.zip", version, archStr);
 }
 
 // -----------------------------------------------------------------------------
@@ -319,31 +345,12 @@ std::string VimPackageProvider::GetArchiveFilename(const PackageVersion& version
 std::vector<std::unique_ptr<PackageProvider>> PackageProviderRegistry::GetRegisteredProviders() {
   std::vector<std::unique_ptr<PackageProvider>> providers;
 
-  auto nodejs = std::make_unique<NodeJsPackageProvider>();
-  auto vscodium = std::make_unique<VSCodiumPackageProvider>();
-  auto python = std::make_unique<PythonPackageProvider>();
-  auto openjdk = std::make_unique<OpenJdkPackageProvider>();
-  auto git = std::make_unique<GitPackageProvider>();
-  auto vim = std::make_unique<VimPackageProvider>();
-
-  if (nodejs->IsPlatformSupported()) {
-    providers.push_back(std::move(nodejs));
-  }
-  if (vscodium->IsPlatformSupported()) {
-    providers.push_back(std::move(vscodium));
-  }
-  if (openjdk->IsPlatformSupported()) {
-    providers.push_back(std::move(openjdk));
-  }
-  if (python->IsPlatformSupported()) {
-    providers.push_back(std::move(python));
-  }
-  if (git->IsPlatformSupported()) {
-    providers.push_back(std::move(git));
-  }
-  if (vim->IsPlatformSupported()) {
-    providers.push_back(std::move(vim));
-  }
+  providers.push_back(std::make_unique<NodeJsPackageProvider>());
+  providers.push_back(std::make_unique<VSCodiumPackageProvider>());
+  providers.push_back(std::make_unique<PythonPackageProvider>());
+  providers.push_back(std::make_unique<OpenJdkPackageProvider>());
+  providers.push_back(std::make_unique<GitPackageProvider>());
+  providers.push_back(std::make_unique<VimPackageProvider>());
 
   return providers;
 }

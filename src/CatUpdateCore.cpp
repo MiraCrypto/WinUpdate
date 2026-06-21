@@ -1,4 +1,5 @@
 #include "CatUpdateCore.hpp"
+#include "PlatformTraits.hpp"
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -10,6 +11,35 @@
 #include <vector>
 
 namespace CatUpdate {
+
+namespace {
+InstalledPackageState ParsePackageState(const nlohmann::json& item) {
+  InstalledPackageState state;
+  state.identifier = item.value("id", "");
+  state.installedVersion = item.value("version", "");
+  state.installationPath = std::filesystem::path(item.value("install_path", ""));
+  state.installationDate = item.value("install_date", "");
+
+  state.targetPlatform = item.value("target_platform", "");
+  if (state.targetPlatform.empty()) {
+    auto const hostPlatform = PlatformTraits::GetPlatformType();
+    if (hostPlatform == PlatformType::Windows) {
+      state.targetPlatform = "windows";
+    } else if (hostPlatform == PlatformType::macOS) {
+      state.targetPlatform = "macos";
+    } else {
+      state.targetPlatform = "linux";
+    }
+  }
+
+  state.targetArchitecture = item.value("target_architecture", "");
+  if (state.targetArchitecture.empty()) {
+    state.targetArchitecture = "x64";
+  }
+
+  return state;
+}
+} // namespace
 
 // -----------------------------------------------------------------------------
 // SystemLogger Common Interface (Delegates debug outputs to platform files)
@@ -63,12 +93,7 @@ bool ManifestManager::LoadManifestFromFile() {
 
     if (jsonData.contains("packages") && jsonData["packages"].is_array()) {
       for (const auto& item : jsonData["packages"]) {
-        InstalledPackageState state;
-        state.identifier = item.value("id", "");
-        state.installedVersion = item.value("version", "");
-        state.installationPath = std::filesystem::path(item.value("install_path", ""));
-        state.installationDate = item.value("install_date", "");
-
+        const InstalledPackageState state = ParsePackageState(item);
         if (!state.identifier.empty() && !state.installedVersion.empty()) {
           m_installedPackages.push_back(state);
         }
@@ -98,6 +123,8 @@ bool ManifestManager::SaveManifestToFile() {
 
   for (const auto& package : m_installedPackages) {
     const nlohmann::json pkgJson = {{"id", package.identifier},
+                                    {"target_platform", package.targetPlatform},
+                                    {"target_architecture", package.targetArchitecture},
                                     {"version", package.installedVersion},
                                     {"install_path", package.installationPath.string()},
                                     {"install_date", package.installationDate}};

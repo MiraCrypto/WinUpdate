@@ -26,6 +26,28 @@ constexpr const char* const COLOR_BOLD = "\033[1m";
 namespace CatUpdate {
 
 namespace {
+struct ParsedTarget {
+  PlatformType platform;
+  ArchitectureType architecture;
+};
+
+std::string PlatformToString(PlatformType platform) {
+  if (platform == PlatformType::Windows) {
+    return "windows";
+  }
+  if (platform == PlatformType::macOS) {
+    return "macos";
+  }
+  return "linux";
+}
+
+std::string ArchToString(ArchitectureType arch) {
+  if (arch == ArchitectureType::Arm64) {
+    return "arm64";
+  }
+  return "x64";
+}
+
 std::string ParseVersionOverride(const std::vector<std::string>& arguments) {
   for (size_t i = 3; i < arguments.size(); ++i) {
     if (arguments[i] == "--version" && i + 1 < arguments.size()) {
@@ -33,6 +55,47 @@ std::string ParseVersionOverride(const std::vector<std::string>& arguments) {
     }
   }
   return "";
+}
+
+ParsedTarget ParseTargetOverride(const std::vector<std::string>& arguments) {
+  // Default to host OS and compile-time host architecture using designated initializers
+  ParsedTarget target{.platform = PlatformTraits::GetPlatformType(),
+                      .architecture = PlatformTraits::GetHostArchitecture()};
+
+  for (size_t i = 3; i < arguments.size(); ++i) {
+    if (arguments[i] == "--target" && i + 1 < arguments.size()) {
+      std::string const& targetStr = arguments[i + 1];
+
+      std::string osPart = targetStr;
+      std::string archPart;
+
+      size_t const dashIndex = targetStr.find('-');
+      if (dashIndex != std::string::npos) {
+        osPart = targetStr.substr(0, dashIndex);
+        archPart = targetStr.substr(dashIndex + 1);
+      }
+
+      // Map OS part
+      if (osPart == "win" || osPart == "windows") {
+        target.platform = PlatformType::Windows;
+      } else if (osPart == "mac" || osPart == "macos" || osPart == "darwin") {
+        target.platform = PlatformType::macOS;
+      } else if (osPart == "linux") {
+        target.platform = PlatformType::Linux;
+      }
+
+      // Map Arch part
+      if (!archPart.empty()) {
+        if (archPart == "arm64" || archPart == "aarch64") {
+          target.architecture = ArchitectureType::Arm64;
+        } else if (archPart == "x64" || archPart == "amd64" || archPart == "x86_64") {
+          target.architecture = ArchitectureType::X64;
+        }
+      }
+      break;
+    }
+  }
+  return target;
 }
 } // namespace
 
@@ -43,16 +106,17 @@ int CommandLineInterface::Run(const std::vector<std::string>& arguments) {
   }
 
   const std::string& command = arguments[1];
+  ParsedTarget const target = ParseTargetOverride(arguments);
 
   if (command == "list") {
-    return ExecuteListCommand();
+    return ExecuteListCommand(target.platform, target.architecture);
   }
   if (command == "info") {
     if (arguments.size() < 3) {
       std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << '\n';
       return 1;
     }
-    return ExecuteInfoCommand(arguments[2]);
+    return ExecuteInfoCommand(arguments[2], target.platform, target.architecture);
   }
   if (command == "install") {
     if (arguments.size() < 3) {
@@ -61,7 +125,7 @@ int CommandLineInterface::Run(const std::vector<std::string>& arguments) {
     }
     const std::string& packageId = arguments[2];
     const std::string versionOverride = ParseVersionOverride(arguments);
-    return ExecuteInstallCommand(packageId, versionOverride);
+    return ExecuteInstallCommand(packageId, versionOverride, target.platform, target.architecture);
   }
 
   if (command == "download") {
@@ -71,7 +135,7 @@ int CommandLineInterface::Run(const std::vector<std::string>& arguments) {
     }
     const std::string& packageId = arguments[2];
     const std::string versionOverride = ParseVersionOverride(arguments);
-    return ExecuteDownloadCommand(packageId, versionOverride);
+    return ExecuteDownloadCommand(packageId, versionOverride, target.platform, target.architecture);
   }
 
   if (command == "uninstall") {
@@ -104,9 +168,11 @@ void CommandLineInterface::PrintUsage() {
   std::cout << "  " << COLOR_GREEN << "install <package_id> [args]" << COLOR_RESET << " Install or update a package"
             << '\n';
   std::cout << "      options: --version <ver>  Install specific version" << '\n';
+  std::cout << "               --target <win|mac|linux>[-arm64] Force target platform/arch" << '\n';
   std::cout << "  " << COLOR_GREEN << "download <package_id> [args]" << COLOR_RESET
             << " Download package archive to current directory" << '\n';
   std::cout << "      options: --version <ver>  Download specific version" << '\n';
+  std::cout << "               --target <win|mac|linux>[-arm64] Force target platform/arch" << '\n';
   std::cout << "  " << COLOR_GREEN << "uninstall <package_id>" << COLOR_RESET << "   Remove an installed package"
             << '\n';
   std::cout << "  " << COLOR_GREEN << "path [<new_path>]" << COLOR_RESET
@@ -114,19 +180,27 @@ void CommandLineInterface::PrintUsage() {
   std::cout << '\n';
 }
 
-int CommandLineInterface::ExecuteListCommand() {
+int CommandLineInterface::ExecuteListCommand(PlatformType targetPlatform, ArchitectureType targetArch) {
   auto rootPath = PathResolver::GetDefaultInstallationRootPath();
   const ManifestManager manifest(rootPath);
   auto providers = PackageProviderRegistry::GetRegisteredProviders();
 
+  const std::string platformStr = PlatformToString(targetPlatform);
+  const std::string archStr = ArchToString(targetArch);
+
   std::cout << COLOR_BOLD << "Root Installation Directory: " << COLOR_RESET
-            << manifest.GetInstallationRootDirectory().string() << '\n'
+            << manifest.GetInstallationRootDirectory().string() << '\n';
+  std::cout << COLOR_BOLD << "Target Profile:              " << COLOR_RESET << platformStr << "-" << archStr << '\n'
             << '\n';
   std::cout << std::format("{:<25} {:<15} {:<20} {:<15}", "Software Name", "Identifier", "Installed Version", "Status")
             << '\n';
   std::cout << std::string(78, '-') << '\n';
 
   for (const auto& provider : providers) {
+    if (!provider->IsPlatformSupported(targetPlatform, targetArch)) {
+      continue;
+    }
+
     std::string status = "Available";
     std::string versionStr = "Not Installed";
 
@@ -134,6 +208,10 @@ int CommandLineInterface::ExecuteListCommand() {
     if (installed.has_value()) {
       status = std::format("{}Installed{}", COLOR_GREEN, COLOR_RESET);
       versionStr = installed->installedVersion;
+      if (installed->targetPlatform != platformStr || installed->targetArchitecture != archStr) {
+        status = std::format("{}Installed ({}-{}){}", COLOR_GREEN, installed->targetPlatform,
+                             installed->targetArchitecture, COLOR_RESET);
+      }
     } else {
       status = std::format("{}Available{}", COLOR_YELLOW, COLOR_RESET);
       versionStr = std::format("{}None{}", COLOR_RED, COLOR_RESET);
@@ -147,17 +225,25 @@ int CommandLineInterface::ExecuteListCommand() {
   return 0;
 }
 
-int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId) {
+int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId, PlatformType targetPlatform,
+                                             ArchitectureType targetArch) {
   auto providers = PackageProviderRegistry::GetRegisteredProviders();
   auto providerIt =
       std::ranges::find_if(providers, [&](const auto& prov) { return prov->GetIdentifier() == packageId; });
 
   if (providerIt == providers.end()) {
-    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not available." << COLOR_RESET << '\n';
+    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported or available." << COLOR_RESET
+              << '\n';
     return 1;
   }
 
   auto* provider = providerIt->get();
+  if (!provider->IsPlatformSupported(targetPlatform, targetArch)) {
+    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported on target '"
+              << PlatformToString(targetPlatform) << "-" << ArchToString(targetArch) << "'." << COLOR_RESET << '\n';
+    return 1;
+  }
+
   auto httpClient = HttpClientFactory::CreateDefaultClient();
 
   std::cout << COLOR_CYAN << "Fetching version info for " << provider->GetDisplayName() << "..." << COLOR_RESET << '\n';
@@ -165,6 +251,8 @@ int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId) {
 
   std::cout << COLOR_BOLD << "Package ID:   " << COLOR_RESET << provider->GetIdentifier() << '\n';
   std::cout << COLOR_BOLD << "Name:         " << COLOR_RESET << provider->GetDisplayName() << '\n';
+  std::cout << COLOR_BOLD << "Target:       " << COLOR_RESET << PlatformToString(targetPlatform) << "-"
+            << ArchToString(targetArch) << '\n';
   std::cout << COLOR_BOLD << "Versions:     " << COLOR_RESET;
   if (versions.empty()) {
     std::cout << COLOR_RED << "None available" << COLOR_RESET << '\n';
@@ -183,7 +271,8 @@ int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId) {
   return 0;
 }
 
-int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, const std::string& versionOverride) {
+int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, const std::string& versionOverride,
+                                                PlatformType targetPlatform, ArchitectureType targetArch) {
   auto providers = PackageProviderRegistry::GetRegisteredProviders();
   auto providerIt =
       std::ranges::find_if(providers, [&](const auto& prov) { return prov->GetIdentifier() == packageId; });
@@ -195,6 +284,12 @@ int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, co
   }
 
   auto* provider = providerIt->get();
+  if (!provider->IsPlatformSupported(targetPlatform, targetArch)) {
+    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported on target '"
+              << PlatformToString(targetPlatform) << "-" << ArchToString(targetArch) << "'." << COLOR_RESET << '\n';
+    return 1;
+  }
+
   auto rootPath = PathResolver::GetDefaultInstallationRootPath();
   ManifestManager manifest(rootPath);
   auto httpClient = HttpClientFactory::CreateDefaultClient();
@@ -216,7 +311,7 @@ int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, co
 
   PackageManager packageManager(manifest);
   bool const success = packageManager.InstallPackage(
-      *provider, targetVersion,
+      *provider, targetVersion, targetPlatform, targetArch,
       // Progress Callback:
       [](float progress) {
         std::cout << "\r[";
@@ -246,7 +341,8 @@ int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, co
   return success ? 0 : 1;
 }
 
-int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, const std::string& versionOverride) {
+int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, const std::string& versionOverride,
+                                                 PlatformType targetPlatform, ArchitectureType targetArch) {
   auto providers = PackageProviderRegistry::GetRegisteredProviders();
   auto providerIt =
       std::ranges::find_if(providers, [&](const auto& prov) { return prov->GetIdentifier() == packageId; });
@@ -258,6 +354,12 @@ int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, c
   }
 
   auto* provider = providerIt->get();
+  if (!provider->IsPlatformSupported(targetPlatform, targetArch)) {
+    std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported on target '"
+              << PlatformToString(targetPlatform) << "-" << ArchToString(targetArch) << "'." << COLOR_RESET << '\n';
+    return 1;
+  }
+
   auto httpClient = HttpClientFactory::CreateDefaultClient();
 
   std::string targetVersion = versionOverride;
@@ -272,8 +374,8 @@ int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, c
     targetVersion = versions[0];
   }
 
-  const UrlString downloadUrl = provider->GetDownloadUrl(targetVersion);
-  const std::string archiveName = provider->GetArchiveFilename(targetVersion);
+  const UrlString downloadUrl = provider->GetDownloadUrl(targetVersion, targetPlatform, targetArch);
+  const std::string archiveName = provider->GetArchiveFilename(targetVersion, targetPlatform, targetArch);
   const std::filesystem::path targetFile = std::filesystem::current_path() / archiveName;
 
   std::cout << COLOR_CYAN
@@ -346,8 +448,6 @@ int CommandLineInterface::ExecutePathCommand(const std::vector<std::string>& pat
 
   try {
     std::filesystem::create_directories(newPath);
-    // Move old manifest if it exists to keep package state? Or start a new manifest.
-    // We'll start a new manifest at that path.
     ManifestManager newManifest(newPath);
     newManifest.SaveManifestToFile();
 

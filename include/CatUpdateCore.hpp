@@ -32,6 +32,8 @@ struct PackageMetadata {
  */
 struct InstalledPackageState {
   PackageIdentifier identifier;
+  std::string targetPlatform;     // e.g. "windows", "macos", "linux"
+  std::string targetArchitecture; // e.g. "x64", "arm64"
   PackageVersion installedVersion;
   std::filesystem::path installationPath;
   std::string installationDate;

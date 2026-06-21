@@ -75,8 +75,13 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
     return 1;
   }
 
-  // Initialize Package Providers
-  m_providers = PackageProviderRegistry::GetRegisteredProviders();
+  // Initialize Package Providers (filter for Windows support at runtime)
+  auto allProviders = PackageProviderRegistry::GetRegisteredProviders();
+  for (auto& provider : allProviders) {
+    if (provider->IsPlatformSupported(PlatformType::Windows, PlatformTraits::GetHostArchitecture())) {
+      m_providers.push_back(std::move(provider));
+    }
+  }
 
   // Set default manifest directory
   auto defaultRootDirectory = PathResolver::GetDefaultInstallationRootPath();
@@ -582,7 +587,7 @@ void DesktopUserInterface::TriggerInstallation() {
     auto tracker = std::make_shared<DownloadProgressTracker>();
 
     bool const installSuccess = packageManager.InstallPackage(
-        *provider, version,
+        *provider, version, PlatformType::Windows, PlatformTraits::GetHostArchitecture(),
         // Progress Callback:
         [tracker](float progress) {
           int percent = static_cast<int>(progress * 100.0F);

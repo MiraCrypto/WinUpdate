@@ -13,18 +13,67 @@
 
 namespace CatUpdate {
 
+namespace {
+std::string PlatformToString(PlatformType platform) {
+  if (platform == PlatformType::Windows) {
+    return "windows";
+  }
+  if (platform == PlatformType::macOS) {
+    return "macos";
+  }
+  return "linux";
+}
+
+std::string ArchToString(ArchitectureType arch) {
+  if (arch == ArchitectureType::Arm64) {
+    return "arm64";
+  }
+  return "x64";
+}
+
+bool CheckPlatformConflict(const ManifestManager& manifest, const PackageIdentifier& packageId,
+                           const std::string& targetPlatformStr, const std::string& targetArchStr,
+                           const LogCallback& logCallback, const PackageName& displayName) {
+  auto const existingInstall = manifest.GetInstalledPackageByIdentifier(packageId);
+  if (existingInstall.has_value()) {
+    if (existingInstall->targetPlatform != targetPlatformStr || existingInstall->targetArchitecture != targetArchStr) {
+      if (logCallback) {
+        logCallback("--------------------------------------------------");
+        logCallback(std::format("ERROR: Platform conflict. {} is already installed targeting '{}-{}'.", displayName,
+                                existingInstall->targetPlatform, existingInstall->targetArchitecture));
+        logCallback(std::format("Requested target: '{}-{}'.", targetPlatformStr, targetArchStr));
+        logCallback("Please uninstall the existing package first to change the target platform/architecture.");
+      }
+      return false;
+    }
+  }
+  return true;
+}
+} // namespace
+
 PackageManager::PackageManager(ManifestManager& manifest) : m_manifest(manifest) {}
 
 bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVersion& version,
+                                    PlatformType targetPlatform, ArchitectureType targetArch,
                                     const ProgressCallback& progressCallback, const LogCallback& logCallback) {
-  auto const url = provider.GetDownloadUrl(version);
-  auto const archiveName = provider.GetArchiveFilename(version);
+  const std::string targetPlatformStr = PlatformToString(targetPlatform);
+  const std::string targetArchStr = ArchToString(targetArch);
+
+  // Check if the package is already installed and detect target platform/arch conflicts
+  if (!CheckPlatformConflict(m_manifest, provider.GetIdentifier(), targetPlatformStr, targetArchStr, logCallback,
+                             provider.GetDisplayName())) {
+    return false;
+  }
+
+  auto const url = provider.GetDownloadUrl(version, targetPlatform, targetArch);
+  auto const archiveName = provider.GetArchiveFilename(version, targetPlatform, targetArch);
   auto const tempArchiveFile = m_manifest.GetInstallationRootDirectory() / ("temp_" + archiveName);
   auto const targetInstallationDir = m_manifest.GetInstallationRootDirectory() / provider.GetIdentifier();
 
   if (logCallback) {
     logCallback("--------------------------------------------------");
-    logCallback(std::format("Installation target: {} (Version: {})", provider.GetDisplayName(), version));
+    logCallback(std::format("Installation target: {} (Version: {}, Target: {}-{})", provider.GetDisplayName(), version,
+                            targetPlatformStr, targetArchStr));
     logCallback("Source URL: " + url);
   }
 
@@ -52,7 +101,7 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
 
   if (logCallback) {
     logCallback("Download completed successfully.");
-    logCallback("Extracting files using native tar.exe...");
+    logCallback("Extracting files...");
   }
 
   try {
@@ -72,7 +121,7 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
 
   if (!extractionResult.has_value() || extractionResult->exitCode != 0) {
     if (logCallback) {
-      logCallback("ERROR: Archive extraction failed (tar.exe exit code non-zero).");
+      logCallback("ERROR: Archive extraction failed (exit code non-zero).");
       if (extractionResult.has_value()) {
         logCallback("Details: " + extractionResult->standardOutput);
       }
@@ -86,6 +135,8 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
 
   InstalledPackageState state;
   state.identifier = provider.GetIdentifier();
+  state.targetPlatform = targetPlatformStr;
+  state.targetArchitecture = targetArchStr;
   state.installedVersion = version;
   state.installationPath = targetInstallationDir;
 
