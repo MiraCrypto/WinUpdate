@@ -32,6 +32,38 @@ bool CheckPlatformConflict(const ManifestManager& manifest, const PackageIdentif
   }
   return true;
 }
+
+void FlattenInstallationDirectory(const std::filesystem::path& directory) {
+  if (!std::filesystem::exists(directory) || !std::filesystem::is_directory(directory)) {
+    return;
+  }
+
+  size_t childCount = 0;
+  std::filesystem::path singleSubdir;
+
+  for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+    childCount++;
+    if (std::filesystem::is_directory(entry.path())) {
+      singleSubdir = entry.path();
+    }
+  }
+
+  // If there is exactly one child and it is a directory, promote its contents
+  if (childCount == 1 && !singleSubdir.empty()) {
+    std::vector<std::filesystem::path> pathsToMove;
+    for (const auto& entry : std::filesystem::directory_iterator(singleSubdir)) {
+      pathsToMove.push_back(entry.path());
+    }
+
+    for (const auto& path : pathsToMove) {
+      std::filesystem::path const destPath = directory / path.filename();
+      std::filesystem::rename(path, destPath);
+    }
+
+    // Remove the now-empty nested directory
+    std::filesystem::remove(singleSubdir);
+  }
+}
 } // namespace
 
 PackageManager::PackageManager(ManifestManager& manifest) : m_manifest(manifest) {}
@@ -115,6 +147,9 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
   if (logCallback) {
     logCallback("Extraction complete.");
   }
+
+  // Flatten directory if the archive was nested
+  FlattenInstallationDirectory(targetInstallationDir);
 
   InstalledPackageState state;
   state.identifier = provider.GetIdentifier();
