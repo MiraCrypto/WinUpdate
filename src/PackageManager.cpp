@@ -14,23 +14,6 @@
 namespace CatUpdate {
 
 namespace {
-std::string PlatformToString(PlatformType platform) {
-  if (platform == PlatformType::Windows) {
-    return "windows";
-  }
-  if (platform == PlatformType::macOS) {
-    return "macos";
-  }
-  return "linux";
-}
-
-std::string ArchToString(ArchitectureType arch) {
-  if (arch == ArchitectureType::Arm64) {
-    return "arm64";
-  }
-  return "x64";
-}
-
 bool CheckPlatformConflict(const ManifestManager& manifest, const PackageIdentifier& packageId,
                            const std::string& targetPlatformStr, const std::string& targetArchStr,
                            const LogCallback& logCallback, const PackageName& displayName) {
@@ -56,8 +39,8 @@ PackageManager::PackageManager(ManifestManager& manifest) : m_manifest(manifest)
 bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVersion& version,
                                     PlatformType targetPlatform, ArchitectureType targetArch,
                                     const ProgressCallback& progressCallback, const LogCallback& logCallback) {
-  const std::string targetPlatformStr = PlatformToString(targetPlatform);
-  const std::string targetArchStr = ArchToString(targetArch);
+  const std::string targetPlatformStr = PlatformTraits::PlatformToString(targetPlatform);
+  const std::string targetArchStr = PlatformTraits::ArchToString(targetArch);
 
   // Check if the package is already installed and detect target platform/arch conflicts
   if (!CheckPlatformConflict(m_manifest, provider.GetIdentifier(), targetPlatformStr, targetArchStr, logCallback,

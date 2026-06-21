@@ -12,6 +12,15 @@
 
 namespace CatUpdate {
 
+namespace {
+int StatusToExitCode(int status) {
+  if (WIFEXITED(status)) {
+    return WEXITSTATUS(status);
+  }
+  return -1;
+}
+} // namespace
+
 std::optional<ProcessExecutionResult>
 ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArguments) {
   if (commandAndArguments.empty()) {
@@ -78,15 +87,8 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
   int status = 0;
   waitpid(pid, &status, 0);
 
-  int exitCode = 0;
-  if (WIFEXITED(status)) {
-    exitCode = WEXITSTATUS(status);
-  } else {
-    exitCode = -1;
-  }
-
   ProcessExecutionResult result;
-  result.exitCode = exitCode;
+  result.exitCode = StatusToExitCode(status);
   result.standardOutput = standardOutput;
   result.standardError = "";
   return result;
@@ -107,15 +109,9 @@ std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteShellCommand(const
   }
 
   const int status = pclose(fileStream);
-  int exitCode = 0;
-  if (WIFEXITED(status)) {
-    exitCode = WEXITSTATUS(status);
-  } else {
-    exitCode = -1;
-  }
 
   ProcessExecutionResult result;
-  result.exitCode = exitCode;
+  result.exitCode = StatusToExitCode(status);
   result.standardOutput = standardOutput;
   result.standardError = "";
   return result;

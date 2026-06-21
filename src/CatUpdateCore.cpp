@@ -22,14 +22,7 @@ InstalledPackageState ParsePackageState(const nlohmann::json& item) {
 
   state.targetPlatform = item.value("target_platform", "");
   if (state.targetPlatform.empty()) {
-    auto const hostPlatform = PlatformTraits::GetPlatformType();
-    if (hostPlatform == PlatformType::Windows) {
-      state.targetPlatform = "windows";
-    } else if (hostPlatform == PlatformType::macOS) {
-      state.targetPlatform = "macos";
-    } else {
-      state.targetPlatform = "linux";
-    }
+    state.targetPlatform = PlatformTraits::PlatformToString(PlatformTraits::GetPlatformType());
   }
 
   state.targetArchitecture = item.value("target_architecture", "");

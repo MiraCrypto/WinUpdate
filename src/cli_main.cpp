@@ -31,23 +31,6 @@ struct ParsedTarget {
   ArchitectureType architecture;
 };
 
-std::string PlatformToString(PlatformType platform) {
-  if (platform == PlatformType::Windows) {
-    return "windows";
-  }
-  if (platform == PlatformType::macOS) {
-    return "macos";
-  }
-  return "linux";
-}
-
-std::string ArchToString(ArchitectureType arch) {
-  if (arch == ArchitectureType::Arm64) {
-    return "arm64";
-  }
-  return "x64";
-}
-
 std::string ParseVersionOverride(const std::vector<std::string>& arguments) {
   for (size_t i = 3; i < arguments.size(); ++i) {
     if (arguments[i] == "--version" && i + 1 < arguments.size()) {
@@ -187,8 +170,8 @@ int CommandLineInterface::ExecuteListCommand(PlatformType targetPlatform, Archit
   const ManifestManager manifest(rootPath);
   auto providers = PackageProviderRegistry::GetRegisteredProviders();
 
-  const std::string platformStr = PlatformToString(targetPlatform);
-  const std::string archStr = ArchToString(targetArch);
+  const std::string platformStr = PlatformTraits::PlatformToString(targetPlatform);
+  const std::string archStr = PlatformTraits::ArchToString(targetArch);
 
   std::cout << COLOR_BOLD << "Root Installation Directory: " << COLOR_RESET
             << manifest.GetInstallationRootDirectory().string() << '\n';
@@ -242,7 +225,8 @@ int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId, Platf
   auto* provider = providerIt->get();
   if (!provider->IsPlatformSupported(targetPlatform, targetArch)) {
     std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported on target '"
-              << PlatformToString(targetPlatform) << "-" << ArchToString(targetArch) << "'." << COLOR_RESET << '\n';
+              << PlatformTraits::PlatformToString(targetPlatform) << "-" << PlatformTraits::ArchToString(targetArch)
+              << "'." << COLOR_RESET << '\n';
     return 1;
   }
 
@@ -253,8 +237,8 @@ int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId, Platf
 
   std::cout << COLOR_BOLD << "Package ID:   " << COLOR_RESET << provider->GetIdentifier() << '\n';
   std::cout << COLOR_BOLD << "Name:         " << COLOR_RESET << provider->GetDisplayName() << '\n';
-  std::cout << COLOR_BOLD << "Target:       " << COLOR_RESET << PlatformToString(targetPlatform) << "-"
-            << ArchToString(targetArch) << '\n';
+  std::cout << COLOR_BOLD << "Target:       " << COLOR_RESET << PlatformTraits::PlatformToString(targetPlatform) << "-"
+            << PlatformTraits::ArchToString(targetArch) << '\n';
   std::cout << COLOR_BOLD << "Versions:     " << COLOR_RESET;
   if (versions.empty()) {
     std::cout << COLOR_RED << "None available" << COLOR_RESET << '\n';
@@ -288,7 +272,8 @@ int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, co
   auto* provider = providerIt->get();
   if (!provider->IsPlatformSupported(targetPlatform, targetArch)) {
     std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported on target '"
-              << PlatformToString(targetPlatform) << "-" << ArchToString(targetArch) << "'." << COLOR_RESET << '\n';
+              << PlatformTraits::PlatformToString(targetPlatform) << "-" << PlatformTraits::ArchToString(targetArch)
+              << "'." << COLOR_RESET << '\n';
     return 1;
   }
 
@@ -358,7 +343,8 @@ int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, c
   auto* provider = providerIt->get();
   if (!provider->IsPlatformSupported(targetPlatform, targetArch)) {
     std::cerr << COLOR_RED << "Error: Package '" << packageId << "' is not supported on target '"
-              << PlatformToString(targetPlatform) << "-" << ArchToString(targetArch) << "'." << COLOR_RESET << '\n';
+              << PlatformTraits::PlatformToString(targetPlatform) << "-" << PlatformTraits::ArchToString(targetArch)
+              << "'." << COLOR_RESET << '\n';
     return 1;
   }
 

@@ -28,8 +28,7 @@ std::string PlatformTraits::GetPlatformNameString(PlatformType platform, Archite
     osStr = "linux";
   }
 
-  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "x64";
-  return osStr + "-" + archStr;
+  return osStr + "-" + ArchToString(arch);
 }
 
 std::string PlatformTraits::GetArchiveExtension() {
@@ -48,6 +47,23 @@ std::string PlatformTraits::GetArchiveExtension(PlatformType platform, Architect
     return ".tar.gz";
   }
   return ".tar.xz";
+}
+
+std::string PlatformTraits::PlatformToString(PlatformType platform) {
+  if (platform == PlatformType::Windows) {
+    return "windows";
+  }
+  if (platform == PlatformType::macOS) {
+    return "macos";
+  }
+  return "linux";
+}
+
+std::string PlatformTraits::ArchToString(ArchitectureType arch) {
+  if (arch == ArchitectureType::Arm64) {
+    return "arm64";
+  }
+  return "x64";
 }
 
 std::vector<std::string> PlatformTraits::GetExtractionCommand(const std::filesystem::path& archivePath,

@@ -37,6 +37,16 @@ public:
   static std::string GetArchiveExtension(PlatformType platform, ArchitectureType arch);
 
   /**
+   * Converts a PlatformType enum to its standard lowercase string representation (e.g. "windows", "macos", "linux").
+   */
+  static std::string PlatformToString(PlatformType platform);
+
+  /**
+   * Converts an ArchitectureType enum to its standard lowercase string representation (e.g. "x64", "arm64").
+   */
+  static std::string ArchToString(ArchitectureType arch);
+
+  /**
    * Returns the command line argument vector required to extract a compressed archive to a target directory.
    */
   static std::vector<std::string> GetExtractionCommand(const std::filesystem::path& archivePath,

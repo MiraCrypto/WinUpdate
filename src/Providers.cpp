@@ -86,7 +86,7 @@ std::string NodeJsPackageProvider::GetArchiveFilename(const PackageVersion& vers
     osStr = "linux";
   }
 
-  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "x64";
+  std::string const archStr = PlatformTraits::ArchToString(arch);
   std::string const ext = PlatformTraits::GetArchiveExtension(platform, arch);
   return std::format("node-{}-{}-{}{}", version, osStr, archStr, ext);
 }
@@ -128,7 +128,7 @@ std::vector<PackageVersion> VSCodiumPackageProvider::FetchAvailableVersions(Http
 UrlString VSCodiumPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType platform,
                                                   ArchitectureType arch) const {
   std::string const platformName = (platform == PlatformType::Windows)
-                                       ? ("win32-" + std::string(arch == ArchitectureType::Arm64 ? "arm64" : "x64"))
+                                       ? ("win32-" + PlatformTraits::ArchToString(arch))
                                        : PlatformTraits::GetPlatformNameString(platform, arch);
   return std::format("https://github.com/VSCodium/vscodium/releases/download/{0}/VSCodium-{1}-{0}{2}", version,
                      platformName, PlatformTraits::GetArchiveExtension(platform, arch));
@@ -137,7 +137,7 @@ UrlString VSCodiumPackageProvider::GetDownloadUrl(const PackageVersion& version,
 std::string VSCodiumPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                                         ArchitectureType arch) const {
   std::string const platformName = (platform == PlatformType::Windows)
-                                       ? ("win32-" + std::string(arch == ArchitectureType::Arm64 ? "arm64" : "x64"))
+                                       ? ("win32-" + PlatformTraits::ArchToString(arch))
                                        : PlatformTraits::GetPlatformNameString(platform, arch);
   return std::format("VSCodium-{}-{}{}", platformName, version, PlatformTraits::GetArchiveExtension(platform, arch));
 }
@@ -327,14 +327,14 @@ UrlString VimPackageProvider::GetDownloadUrl(const PackageVersion& version, Plat
   if (sanitizedVersion.starts_with("v")) {
     sanitizedVersion = sanitizedVersion.substr(1);
   }
-  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "x64";
+  std::string const archStr = PlatformTraits::ArchToString(arch);
   return std::format("https://github.com/vim/vim-win32-installer/releases/download/{0}/gvim_{1}_{2}.zip", version,
                      sanitizedVersion, archStr);
 }
 
 std::string VimPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType /*platform*/,
                                                    ArchitectureType arch) const {
-  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "x64";
+  std::string const archStr = PlatformTraits::ArchToString(arch);
   return std::format("gvim_{}_{}.zip", version, archStr);
 }
 

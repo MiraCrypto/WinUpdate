@@ -19,6 +19,74 @@
 
 namespace CatUpdate {
 
+namespace {
+std::optional<ProcessExecutionResult> ExecuteCommandLineInternal(const std::wstring& commandLine, bool logErrors) {
+  HANDLE stdoutReadPipe = nullptr;
+  HANDLE stdoutWritePipe = nullptr;
+  SECURITY_ATTRIBUTES securityAttributes = {.nLength = sizeof(SECURITY_ATTRIBUTES)};
+  securityAttributes.bInheritHandle = TRUE;
+  securityAttributes.lpSecurityDescriptor = nullptr;
+
+  if (CreatePipe(&stdoutReadPipe, &stdoutWritePipe, &securityAttributes, 0) == 0) {
+    if (logErrors) {
+      SystemLogger::LogError("Failed to create execution pipes.");
+    }
+    return std::nullopt;
+  }
+
+  if (SetHandleInformation(stdoutReadPipe, HANDLE_FLAG_INHERIT, 0) == 0) {
+    CloseHandle(stdoutReadPipe);
+    CloseHandle(stdoutWritePipe);
+    return std::nullopt;
+  }
+
+  STARTUPINFOW startupInfo = {.cb = sizeof(startupInfo)};
+  startupInfo.dwFlags = STARTF_USESTDHANDLES;
+  startupInfo.hStdOutput = stdoutWritePipe;
+  startupInfo.hStdError = stdoutWritePipe;
+  startupInfo.hStdInput = nullptr;
+
+  PROCESS_INFORMATION processInfo = {};
+
+  BOOL const success = CreateProcessW(nullptr, const_cast<LPWSTR>(commandLine.c_str()), nullptr, nullptr, TRUE,
+                                      CREATE_NO_WINDOW, nullptr, nullptr, &startupInfo, &processInfo);
+
+  // Close the write end of the pipe as we no longer need it
+  CloseHandle(stdoutWritePipe);
+
+  if (success == 0) {
+    CloseHandle(stdoutReadPipe);
+    if (logErrors) {
+      SystemLogger::LogError("CreateProcessW failed to launch command.");
+    }
+    return std::nullopt;
+  }
+
+  std::string standardOutput;
+  std::array<char, 1024> buffer{};
+  DWORD bytesRead = 0;
+  while ((ReadFile(stdoutReadPipe, buffer.data(), static_cast<DWORD>(buffer.size() - 1), &bytesRead, nullptr) != 0) &&
+         bytesRead > 0) {
+    buffer[bytesRead] = '\0';
+    standardOutput.append(buffer.data(), bytesRead);
+  }
+
+  WaitForSingleObject(processInfo.hProcess, INFINITE);
+  DWORD exitCode = 0;
+  GetExitCodeProcess(processInfo.hProcess, &exitCode);
+
+  CloseHandle(processInfo.hProcess);
+  CloseHandle(processInfo.hThread);
+  CloseHandle(stdoutReadPipe);
+
+  ProcessExecutionResult result;
+  result.exitCode = static_cast<int>(exitCode);
+  result.standardOutput = standardOutput;
+  result.standardError = "";
+  return result;
+}
+} // namespace
+
 std::optional<ProcessExecutionResult>
 ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArguments) {
   if (commandAndArguments.empty()) {
@@ -43,127 +111,13 @@ ProcessExecutor::ExecuteCommand(const std::vector<std::string>& commandAndArgume
     commandLine += wArg;
   }
 
-  // Create pipes for stdout/stderr redirection
-  HANDLE stdoutReadPipe = nullptr;
-  HANDLE stdoutWritePipe = nullptr;
-  SECURITY_ATTRIBUTES securityAttributes = {.nLength = sizeof(SECURITY_ATTRIBUTES)};
-  securityAttributes.bInheritHandle = TRUE;
-  securityAttributes.lpSecurityDescriptor = nullptr;
-
-  if (CreatePipe(&stdoutReadPipe, &stdoutWritePipe, &securityAttributes, 0) == 0) {
-    SystemLogger::LogError("Failed to create execution pipes.");
-    return std::nullopt;
-  }
-
-  // Ensure the read handle to the pipe is not inherited
-  if (SetHandleInformation(stdoutReadPipe, HANDLE_FLAG_INHERIT, 0) == 0) {
-    CloseHandle(stdoutReadPipe);
-    CloseHandle(stdoutWritePipe);
-    return std::nullopt;
-  }
-
-  STARTUPINFOW startupInfo = {.cb = sizeof(startupInfo)};
-  startupInfo.dwFlags = STARTF_USESTDHANDLES;
-  startupInfo.hStdOutput = stdoutWritePipe;
-  startupInfo.hStdError = stdoutWritePipe; // Redirect stderr to stdout for simplicity
-  startupInfo.hStdInput = nullptr;
-
-  PROCESS_INFORMATION processInfo = {};
-
-  // Launch process with CREATE_NO_WINDOW flag
-  BOOL const success = CreateProcessW(nullptr, const_cast<LPWSTR>(commandLine.c_str()), nullptr, nullptr, TRUE,
-                                      CREATE_NO_WINDOW, nullptr, nullptr, &startupInfo, &processInfo);
-
-  // Close the write end of the pipe as we no longer need it
-  CloseHandle(stdoutWritePipe);
-
-  if (success == 0) {
-    CloseHandle(stdoutReadPipe);
-    SystemLogger::LogError("CreateProcessW failed to launch: " + commandAndArguments[0]);
-    return std::nullopt;
-  }
-
-  // Read output from pipe
-  std::string standardOutput;
-  std::array<char, 1024> buffer{};
-  DWORD bytesRead = 0;
-  while ((ReadFile(stdoutReadPipe, buffer.data(), static_cast<DWORD>(buffer.size() - 1), &bytesRead, nullptr) != 0) &&
-         bytesRead > 0) {
-    buffer[bytesRead] = '\0';
-    standardOutput.append(buffer.data(), bytesRead);
-  }
-
-  // Wait for process to exit and get code
-  WaitForSingleObject(processInfo.hProcess, INFINITE);
-  DWORD exitCode = 0;
-  GetExitCodeProcess(processInfo.hProcess, &exitCode);
-
-  // Clean up handles
-  CloseHandle(processInfo.hProcess);
-  CloseHandle(processInfo.hThread);
-  CloseHandle(stdoutReadPipe);
-
-  ProcessExecutionResult result;
-  result.exitCode = static_cast<int>(exitCode);
-  result.standardOutput = standardOutput;
-  result.standardError = "";
-  return result;
+  return ExecuteCommandLineInternal(commandLine, true);
 }
 
 std::optional<ProcessExecutionResult> ProcessExecutor::ExecuteShellCommand(const std::string& shellCommandLine) {
   std::wstring const wCommandLine = Utils::ToWString(shellCommandLine);
   std::wstring const fullCommand = L"cmd.exe /c " + wCommandLine;
-
-  HANDLE stdoutReadPipe = nullptr;
-  HANDLE stdoutWritePipe = nullptr;
-  SECURITY_ATTRIBUTES securityAttributes = {.nLength = sizeof(SECURITY_ATTRIBUTES)};
-  securityAttributes.bInheritHandle = TRUE;
-
-  if (CreatePipe(&stdoutReadPipe, &stdoutWritePipe, &securityAttributes, 0) == 0) {
-    return std::nullopt;
-  }
-
-  SetHandleInformation(stdoutReadPipe, HANDLE_FLAG_INHERIT, 0);
-
-  STARTUPINFOW startupInfo = {.cb = sizeof(startupInfo)};
-  startupInfo.dwFlags = STARTF_USESTDHANDLES;
-  startupInfo.hStdOutput = stdoutWritePipe;
-  startupInfo.hStdError = stdoutWritePipe;
-  startupInfo.hStdInput = nullptr;
-
-  PROCESS_INFORMATION processInfo = {};
-
-  BOOL const success = CreateProcessW(nullptr, const_cast<LPWSTR>(fullCommand.c_str()), nullptr, nullptr, TRUE,
-                                      CREATE_NO_WINDOW, nullptr, nullptr, &startupInfo, &processInfo);
-
-  CloseHandle(stdoutWritePipe);
-
-  if (success == 0) {
-    CloseHandle(stdoutReadPipe);
-    return std::nullopt;
-  }
-
-  std::string standardOutput;
-  std::array<char, 1024> buffer{};
-  DWORD bytesRead = 0;
-  while ((ReadFile(stdoutReadPipe, buffer.data(), static_cast<DWORD>(buffer.size() - 1), &bytesRead, nullptr) != 0) &&
-         bytesRead > 0) {
-    buffer[bytesRead] = '\0';
-    standardOutput.append(buffer.data(), bytesRead);
-  }
-
-  WaitForSingleObject(processInfo.hProcess, INFINITE);
-  DWORD exitCode = 0;
-  GetExitCodeProcess(processInfo.hProcess, &exitCode);
-
-  CloseHandle(processInfo.hProcess);
-  CloseHandle(processInfo.hThread);
-  CloseHandle(stdoutReadPipe);
-
-  ProcessExecutionResult result;
-  result.exitCode = static_cast<int>(exitCode);
-  result.standardOutput = standardOutput;
-  return result;
+  return ExecuteCommandLineInternal(fullCommand, false);
 }
 
 } // namespace CatUpdate
