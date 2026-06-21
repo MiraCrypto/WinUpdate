@@ -62,7 +62,7 @@ ParsedTarget ParseTargetOverride(const std::vector<std::string>& arguments) {
   ParsedTarget target{.platform = PlatformTraits::GetPlatformType(),
                       .architecture = PlatformTraits::GetHostArchitecture()};
 
-  for (size_t i = 3; i < arguments.size(); ++i) {
+  for (size_t i = 2; i < arguments.size(); ++i) {
     if (arguments[i] == "--target" && i + 1 < arguments.size()) {
       std::string const& targetStr = arguments[i + 1];
 
@@ -161,10 +161,12 @@ void CommandLineInterface::PrintUsage() {
   std::cout << COLOR_BOLD << "Usage:" << COLOR_RESET << '\n';
   std::cout << "  catupdate <command> [arguments]" << '\n' << '\n';
   std::cout << COLOR_BOLD << "Commands:" << COLOR_RESET << '\n';
-  std::cout << "  " << COLOR_GREEN << "list" << COLOR_RESET
-            << "                      List all available packages, versions, and status" << '\n';
-  std::cout << "  " << COLOR_GREEN << "info <package_id>" << COLOR_RESET
-            << "         Show detailed package info and versions" << '\n';
+  std::cout << "  " << COLOR_GREEN << "list [args]" << COLOR_RESET
+            << "                 List all available packages, versions, and status" << '\n';
+  std::cout << "      options: --target <win|mac|linux>[-arm64] Force target platform/arch" << '\n';
+  std::cout << "  " << COLOR_GREEN << "info <package_id> [args]" << COLOR_RESET
+            << "    Show detailed package info and versions" << '\n';
+  std::cout << "      options: --target <win|mac|linux>[-arm64] Force target platform/arch" << '\n';
   std::cout << "  " << COLOR_GREEN << "install <package_id> [args]" << COLOR_RESET << " Install or update a package"
             << '\n';
   std::cout << "      options: --version <ver>  Install specific version" << '\n';
