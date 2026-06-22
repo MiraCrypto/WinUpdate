@@ -268,7 +268,7 @@ UrlString OpenJdkPackageProvider::GetDownloadUrl(const PackageVersion& version, 
 std::string OpenJdkPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                                        ArchitectureType arch) const {
   const std::string archStr = GetAdoptiumArchString(arch);
-  const std::string ext = PlatformTraits::GetArchiveExtension(platform, arch);
+  const std::string ext = (platform == PlatformType::Windows) ? ".zip" : ".tar.gz";
   return std::format("openjdk-{}-{}{}", version, archStr, ext);
 }
 

@@ -134,7 +134,7 @@ TEST(ProvidersTest, OpenJdkMultiPlatform) {
               "https://api.adoptium.net/v3/binary/version/jdk-17.0.1+12/linux/aarch64/jdk/hotspot/"
               "normal/eclipse");
   ASSERT_TRUE(jdk.GetArchiveFilename("jdk-17.0.1+12", PlatformType::Linux, ArchitectureType::Arm64) ==
-              "openjdk-jdk-17.0.1+12-aarch64.tar.xz");
+              "openjdk-jdk-17.0.1+12-aarch64.tar.gz");
 }
 
 } // namespace CatUpdate
