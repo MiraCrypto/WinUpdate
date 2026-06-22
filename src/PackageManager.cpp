@@ -64,6 +64,52 @@ void FlattenInstallationDirectory(const std::filesystem::path& directory) {
     std::filesystem::remove(singleSubdir);
   }
 }
+
+bool SwapDirectoriesWithRollback(const std::filesystem::path& tempExtractDir,
+                                 const std::filesystem::path& targetInstallationDir,
+                                 const std::filesystem::path& oldBackupDir, const LogCallback& logCallback) {
+  // Clean up old backup directory if exists (best effort from previous runs)
+  if (std::filesystem::exists(oldBackupDir)) {
+    try {
+      std::filesystem::remove_all(oldBackupDir);
+    } catch (const std::exception& ex) {
+      SystemLogger::LogInformation("Warning: Failed to clean up stale backup directory: " + std::string(ex.what()));
+    }
+  }
+
+  try {
+    if (std::filesystem::exists(targetInstallationDir)) {
+      std::filesystem::rename(targetInstallationDir, oldBackupDir);
+    }
+    std::filesystem::rename(tempExtractDir, targetInstallationDir);
+  } catch (const std::exception& ex) {
+    if (logCallback) {
+      logCallback("ERROR: Failed to swap installation directories: " + std::string(ex.what()));
+    }
+    // Rollback
+    if (std::filesystem::exists(oldBackupDir) && !std::filesystem::exists(targetInstallationDir)) {
+      try {
+        std::filesystem::rename(oldBackupDir, targetInstallationDir);
+      } catch (const std::exception& rollbackEx) {
+        SystemLogger::LogError("Critical: Failed to roll back installation directory swap: " +
+                               std::string(rollbackEx.what()));
+      }
+    }
+    std::filesystem::remove_all(tempExtractDir);
+    return false;
+  }
+
+  // Clean up old backup directory (best effort)
+  try {
+    if (std::filesystem::exists(oldBackupDir)) {
+      std::filesystem::remove_all(oldBackupDir);
+    }
+  } catch (const std::exception& cleanupEx) {
+    SystemLogger::LogInformation("Warning: Stale backup directory cleanup deferred: " + std::string(cleanupEx.what()));
+  }
+
+  return true;
+}
 } // namespace
 
 PackageManager::PackageManager(ManifestManager& manifest) : m_manifest(manifest) {}
@@ -83,7 +129,12 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
   auto const url = provider.GetDownloadUrl(version, targetPlatform, targetArch);
   auto const archiveName = provider.GetArchiveFilename(version, targetPlatform, targetArch);
   auto const tempArchiveFile = m_manifest.GetInstallationRootDirectory() / ("temp_" + archiveName);
+  auto const tempExtractDir = m_manifest.GetInstallationRootDirectory() / ("temp_extract_" + provider.GetIdentifier());
   auto const targetInstallationDir = m_manifest.GetInstallationRootDirectory() / provider.GetIdentifier();
+
+  // 1. Clean up any leftover temporary files/folders from previous crashed runs
+  std::filesystem::remove(tempArchiveFile);
+  std::filesystem::remove_all(tempExtractDir);
 
   if (logCallback) {
     logCallback("--------------------------------------------------");
@@ -108,9 +159,7 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
     if (logCallback) {
       logCallback("ERROR: Download request failed.");
     }
-    if (std::filesystem::exists(tempArchiveFile)) {
-      std::filesystem::remove(tempArchiveFile);
-    }
+    std::filesystem::remove(tempArchiveFile);
     return false;
   }
 
@@ -119,18 +168,19 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
     logCallback("Extracting files...");
   }
 
+  // 2. Create the temporary sandbox directory
   try {
-    std::filesystem::create_directories(targetInstallationDir);
+    std::filesystem::create_directories(tempExtractDir);
   } catch (const std::exception& ex) {
     if (logCallback) {
-      logCallback("ERROR: Failed to create installation directory: " + std::string(ex.what()));
+      logCallback("ERROR: Failed to create sandbox directory: " + std::string(ex.what()));
     }
     std::filesystem::remove(tempArchiveFile);
     return false;
   }
 
-  auto const extractionCommand = PlatformTraits::GetExtractionCommand(tempArchiveFile, targetInstallationDir);
-
+  // 3. Extract into the sandbox
+  auto const extractionCommand = PlatformTraits::GetExtractionCommand(tempArchiveFile, tempExtractDir);
   auto const extractionResult = ProcessExecutor::ExecuteCommand(extractionCommand);
   std::filesystem::remove(tempArchiveFile);
 
@@ -141,6 +191,7 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
         logCallback("Details: " + extractionResult->standardOutput);
       }
     }
+    std::filesystem::remove_all(tempExtractDir);
     return false;
   }
 
@@ -148,8 +199,14 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
     logCallback("Extraction complete.");
   }
 
-  // Flatten directory if the archive was nested
-  FlattenInstallationDirectory(targetInstallationDir);
+  // 4. Flatten the directory inside the sandbox
+  FlattenInstallationDirectory(tempExtractDir);
+
+  // 5. Atomic swap with rollback protection
+  auto const oldBackupDir = m_manifest.GetInstallationRootDirectory() / ("old_" + provider.GetIdentifier());
+  if (!SwapDirectoriesWithRollback(tempExtractDir, targetInstallationDir, oldBackupDir, logCallback)) {
+    return false;
+  }
 
   InstalledPackageState state;
   state.identifier = provider.GetIdentifier();
