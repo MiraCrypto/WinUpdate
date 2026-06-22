@@ -49,6 +49,13 @@ public:
   virtual std::string GetArchiveFilename(const PackageVersion& version,
                                          PlatformType platform = PlatformTraits::GetPlatformType(),
                                          ArchitectureType arch = PlatformTraits::GetHostArchitecture()) const = 0;
+  /**
+   * Returns an optional nested subpath inside the archive containing the actual application binaries.
+   * If specified (non-empty), the installer will promote the contents of this subdirectory and discard all other files.
+   */
+  virtual std::string GetArchiveInternalRoot() const {
+    return "";
+  }
 };
 
 /**
@@ -88,7 +95,7 @@ public:
 };
 
 /**
- * Package provider for Embeddable Python (Windows-only).
+ * Package provider for Python (Windows-only via NuGet full binaries).
  */
 class PythonPackageProvider : public BasePackageProvider {
 public:
@@ -99,6 +106,7 @@ public:
   UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
   std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                  ArchitectureType arch) const override;
+  std::string GetArchiveInternalRoot() const override;
 };
 
 /**

@@ -90,4 +90,26 @@ TEST(ProvidersTest, DownloadFilenameFormatting) {
   ASSERT_TRUE(linuxArm64 == "node-20.11.1-linux-arm64.tar.xz");
 }
 
+TEST(ProvidersTest, PythonNugetProvider) {
+  const PythonPackageProvider pythonProvider;
+
+  // Test that Python specifies "tools" as internal root
+  ASSERT_TRUE(pythonProvider.GetArchiveInternalRoot() == "tools");
+
+  // Test Windows x64 NuGet package name and URL
+  std::string const winX64Url = pythonProvider.GetDownloadUrl("3.12.3", PlatformType::Windows, ArchitectureType::X64);
+  std::string const winX64Filename =
+      pythonProvider.GetArchiveFilename("3.12.3", PlatformType::Windows, ArchitectureType::X64);
+  ASSERT_TRUE(winX64Url == "https://www.nuget.org/api/v2/package/python/3.12.3");
+  ASSERT_TRUE(winX64Filename == "python-3.12.3.nupkg");
+
+  // Test Windows ARM64 NuGet package name and URL
+  std::string const winArm64Url =
+      pythonProvider.GetDownloadUrl("3.12.3", PlatformType::Windows, ArchitectureType::Arm64);
+  std::string const winArm64Filename =
+      pythonProvider.GetArchiveFilename("3.12.3", PlatformType::Windows, ArchitectureType::Arm64);
+  ASSERT_TRUE(winArm64Url == "https://www.nuget.org/api/v2/package/pythonarm64/3.12.3");
+  ASSERT_TRUE(winArm64Filename == "pythonarm64-3.12.3.nupkg");
+}
+
 } // namespace CatUpdate

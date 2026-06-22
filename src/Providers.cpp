@@ -2,6 +2,7 @@
 #include "CatUpdateCore.hpp"
 #include "HttpClient.hpp"
 #include "PlatformTraits.hpp"
+#include <algorithm>
 #include <cstddef>
 #include <exception>
 #include <format>
@@ -143,7 +144,7 @@ std::string VSCodiumPackageProvider::GetArchiveFilename(const PackageVersion& ve
 }
 
 // -----------------------------------------------------------------------------
-// Python Provider Implementation (Windows-only)
+// Python Provider Implementation (Windows-only via NuGet)
 // -----------------------------------------------------------------------------
 
 PackageIdentifier PythonPackageProvider::GetIdentifier() const {
@@ -151,27 +152,47 @@ PackageIdentifier PythonPackageProvider::GetIdentifier() const {
 }
 
 PackageName PythonPackageProvider::GetDisplayName() const {
-  return "Python (Embeddable)";
+  return "Python";
 }
 
 bool PythonPackageProvider::IsPlatformSupported(PlatformType platform, ArchitectureType /*arch*/) const {
   return platform == PlatformType::Windows;
 }
 
-std::vector<PackageVersion> PythonPackageProvider::FetchAvailableVersions(HttpClient& /*httpClient*/) {
-  return {"3.12.3", "3.11.9", "3.10.11"};
+std::vector<PackageVersion> PythonPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
+  std::vector<PackageVersion> versions;
+  try {
+    std::string const queryUrl = "https://api-v2v3search-0.nuget.org/autocomplete?id=python&prerelease=false";
+    std::string const response = FetchRemoteJson(httpClient, queryUrl);
+    nlohmann::json const json = nlohmann::json::parse(response);
+
+    if (json.contains("data") && json["data"].is_array()) {
+      for (const auto& item : json["data"]) {
+        versions.push_back(item.get<std::string>());
+      }
+    }
+
+    std::ranges::reverse(versions);
+  } catch (const std::exception& ex) {
+    SystemLogger::LogError("Failed to fetch Python versions from NuGet API", ex.what());
+  }
+  return versions;
 }
 
 UrlString PythonPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType /*platform*/,
                                                 ArchitectureType arch) const {
-  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "amd64";
-  return std::format("https://www.python.org/ftp/python/{0}/python-{0}-embed-{1}.zip", version, archStr);
+  std::string const packageId = (arch == ArchitectureType::Arm64) ? "pythonarm64" : "python";
+  return std::format("https://www.nuget.org/api/v2/package/{0}/{1}", packageId, version);
 }
 
 std::string PythonPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType /*platform*/,
                                                       ArchitectureType arch) const {
-  std::string const archStr = (arch == ArchitectureType::Arm64) ? "arm64" : "amd64";
-  return std::format("python-{}-embed-{}.zip", version, archStr);
+  std::string const packageId = (arch == ArchitectureType::Arm64) ? "pythonarm64" : "python";
+  return std::format("{}-{}.nupkg", packageId, version);
+}
+
+std::string PythonPackageProvider::GetArchiveInternalRoot() const {
+  return "tools";
 }
 
 // -----------------------------------------------------------------------------

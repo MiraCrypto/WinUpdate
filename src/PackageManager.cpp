@@ -65,6 +65,39 @@ void FlattenInstallationDirectory(const std::filesystem::path& directory) {
   }
 }
 
+void PromoteInternalRootDirectory(const std::filesystem::path& directory, const std::string& internalRoot) {
+  const std::filesystem::path internalRootPath = directory / internalRoot;
+  if (!std::filesystem::exists(internalRootPath) || !std::filesystem::is_directory(internalRootPath)) {
+    return;
+  }
+
+  // 1. Move the internal root directory to a temporary location outside the target directory
+  const std::filesystem::path tempPromotePath =
+      directory.parent_path() / ("temp_promote_" + directory.filename().string());
+  if (std::filesystem::exists(tempPromotePath)) {
+    std::filesystem::remove_all(tempPromotePath);
+  }
+  std::filesystem::rename(internalRootPath, tempPromotePath);
+
+  // 2. Delete the target directory completely (wiping all metadata files)
+  std::filesystem::remove_all(directory);
+  std::filesystem::create_directories(directory);
+
+  // 3. Move everything from tempPromotePath into the target directory
+  std::vector<std::filesystem::path> pathsToMove;
+  for (const auto& entry : std::filesystem::directory_iterator(tempPromotePath)) {
+    pathsToMove.push_back(entry.path());
+  }
+
+  for (const auto& path : pathsToMove) {
+    std::filesystem::path const destPath = directory / path.filename();
+    std::filesystem::rename(path, destPath);
+  }
+
+  // 4. Clean up the temp promote directory
+  std::filesystem::remove_all(tempPromotePath);
+}
+
 bool SwapDirectoriesWithRollback(const std::filesystem::path& tempExtractDir,
                                  const std::filesystem::path& targetInstallationDir,
                                  const std::filesystem::path& oldBackupDir, const LogCallback& logCallback) {
@@ -197,6 +230,12 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
 
   if (logCallback) {
     logCallback("Extraction complete.");
+  }
+
+  // Promote internal root directory if specified by the provider (e.g., Python NuGet "tools" folder)
+  const std::string internalRoot = provider.GetArchiveInternalRoot();
+  if (!internalRoot.empty()) {
+    PromoteInternalRootDirectory(tempExtractDir, internalRoot);
   }
 
   // 4. Flatten the directory inside the sandbox
