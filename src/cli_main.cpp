@@ -40,6 +40,10 @@ std::string ParseVersionOverride(const std::vector<std::string>& arguments) {
   return "";
 }
 
+bool HasArgument(const std::vector<std::string>& arguments, const std::string& flag) {
+  return std::ranges::find(arguments, flag) != arguments.end();
+}
+
 ParsedTarget ParseTargetOverride(const std::vector<std::string>& arguments) {
   // Default to host OS and compile-time host architecture using designated initializers
   ParsedTarget target{.platform = PlatformTraits::GetPlatformType(),
@@ -99,7 +103,8 @@ int CommandLineInterface::Run(const std::vector<std::string>& arguments) {
       std::cerr << COLOR_RED << "Error: Missing package identifier." << COLOR_RESET << '\n';
       return 1;
     }
-    return ExecuteInfoCommand(arguments[2], target.platform, target.architecture);
+    bool const showAll = HasArgument(arguments, "--all");
+    return ExecuteInfoCommand(arguments[2], target.platform, target.architecture, showAll);
   }
   if (command == "install") {
     if (arguments.size() < 3) {
@@ -149,7 +154,8 @@ void CommandLineInterface::PrintUsage() {
   std::cout << "      options: --target <win|mac|linux>[-arm64] Force target platform/arch" << '\n';
   std::cout << "  " << COLOR_GREEN << "info <package_id> [args]" << COLOR_RESET
             << "    Show detailed package info and versions" << '\n';
-  std::cout << "      options: --target <win|mac|linux>[-arm64] Force target platform/arch" << '\n';
+  std::cout << "      options: --all                   Show all available versions instead of abbreviated list" << '\n';
+  std::cout << "               --target <win|mac|linux>[-arm64] Force target platform/arch" << '\n';
   std::cout << "  " << COLOR_GREEN << "install <package_id> [args]" << COLOR_RESET << " Install or update a package"
             << '\n';
   std::cout << "      options: --version <ver>  Install specific version" << '\n';
@@ -211,7 +217,7 @@ int CommandLineInterface::ExecuteListCommand(PlatformType targetPlatform, Archit
 }
 
 int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId, PlatformType targetPlatform,
-                                             ArchitectureType targetArch) {
+                                             ArchitectureType targetArch, bool showAllVersions) {
   auto providers = PackageProviderRegistry::GetRegisteredProviders();
   auto providerIt =
       std::ranges::find_if(providers, [&](const auto& prov) { return prov->GetIdentifier() == packageId; });
@@ -242,6 +248,14 @@ int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId, Platf
   std::cout << COLOR_BOLD << "Versions:     " << COLOR_RESET;
   if (versions.empty()) {
     std::cout << COLOR_RED << "None available" << COLOR_RESET << '\n';
+  } else if (showAllVersions) {
+    for (size_t i = 0; i < versions.size(); ++i) {
+      if (i > 0) {
+        std::cout << ", ";
+      }
+      std::cout << versions[i];
+    }
+    std::cout << '\n';
   } else {
     for (size_t i = 0; i < std::min(versions.size(), static_cast<size_t>(5)); ++i) {
       if (i > 0) {

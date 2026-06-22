@@ -15,7 +15,8 @@ public:
 private:
   static void PrintUsage();
   static int ExecuteListCommand(PlatformType targetPlatform, ArchitectureType targetArch);
-  static int ExecuteInfoCommand(const std::string& packageId, PlatformType targetPlatform, ArchitectureType targetArch);
+  static int ExecuteInfoCommand(const std::string& packageId, PlatformType targetPlatform, ArchitectureType targetArch,
+                                bool showAllVersions);
   static int ExecuteInstallCommand(const std::string& packageId, const std::string& versionOverride,
                                    PlatformType targetPlatform, ArchitectureType targetArch);
   static int ExecuteDownloadCommand(const std::string& packageId, const std::string& versionOverride,
