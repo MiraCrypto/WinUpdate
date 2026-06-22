@@ -111,5 +111,6 @@ if(WIN32)
         gdi32
         user32
         kernel32
+        shell32
     )
 endif()
