@@ -159,6 +159,21 @@ TEST(PlatformTraitsTest, GetPosixTarExtractionCommand) {
   ASSERT_TRUE(cmd[4] == dest.string());
 }
 
+TEST(PlatformTraitsTest, GetPosixNupkgExtractionCommand) {
+  const std::filesystem::path archive = "test_archive.nupkg";
+  const std::filesystem::path dest = "test_destination";
+
+  auto cmd = PlatformTraits::GetExtractionCommand(PlatformType::macOS, archive, dest);
+  ASSERT_FALSE(cmd.empty());
+  ASSERT_TRUE(cmd.size() == 6);
+  ASSERT_TRUE(cmd[0] == "unzip");
+  ASSERT_TRUE(cmd[1] == "-q");
+  ASSERT_TRUE(cmd[2] == "-o");
+  ASSERT_TRUE(cmd[3] == archive.string());
+  ASSERT_TRUE(cmd[4] == "-d");
+  ASSERT_TRUE(cmd[5] == dest.string());
+}
+
 TEST(PlatformTraitsTest, ActivePlatformPropertiesMatch) {
   auto type = PlatformTraits::GetPlatformType();
   auto arch = PlatformTraits::GetHostArchitecture();

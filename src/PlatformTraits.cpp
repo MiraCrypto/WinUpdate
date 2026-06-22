@@ -77,7 +77,8 @@ std::vector<std::string> PlatformTraits::GetExtractionCommand(PlatformType platf
   if (platform == PlatformType::Windows) {
     return {"tar.exe", "-xf", archivePath.string(), "-C", destinationDirectory.string()};
   }
-  if (archivePath.extension() == ".zip") {
+  const std::string ext = archivePath.extension().string();
+  if (ext == ".zip" || ext == ".nupkg") {
     return {"unzip", "-q", "-o", archivePath.string(), "-d", destinationDirectory.string()};
   }
   return {"tar", "-xf", archivePath.string(), "-C", destinationDirectory.string()};
