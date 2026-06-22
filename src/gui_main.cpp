@@ -638,9 +638,11 @@ void DesktopUserInterface::TriggerPathChange() {
     fileOpenDialog->SetTitle(L"Select No-Admin Installation Directory");
 
     // Pre-set the dialog to open at the current installation path
-    std::wstring const currentPath = m_manifest->GetInstallationRootDirectory().wstring();
+    std::filesystem::path currentPath = m_manifest->GetInstallationRootDirectory();
+
+    std::wstring const nativePath = currentPath.make_preferred().wstring();
     IShellItem* defaultFolderItem = nullptr;
-    if (SUCCEEDED(SHCreateItemFromParsingName(currentPath.c_str(), nullptr, IID_PPV_ARGS(&defaultFolderItem)))) {
+    if (SUCCEEDED(SHCreateItemFromParsingName(nativePath.c_str(), nullptr, IID_PPV_ARGS(&defaultFolderItem)))) {
       fileOpenDialog->SetFolder(defaultFolderItem);
       defaultFolderItem->Release();
     }
