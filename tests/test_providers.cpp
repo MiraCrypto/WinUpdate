@@ -112,4 +112,29 @@ TEST(ProvidersTest, PythonNugetProvider) {
   ASSERT_TRUE(winArm64Filename == "pythonarm64-3.12.3.nupkg");
 }
 
+TEST(ProvidersTest, OpenJdkMultiPlatform) {
+  const OpenJdkPackageProvider jdk;
+
+  // Windows x64
+  ASSERT_TRUE(jdk.GetDownloadUrl("jdk-17.0.1+12", PlatformType::Windows, ArchitectureType::X64) ==
+              "https://api.adoptium.net/v3/binary/version/jdk-17.0.1+12/windows/x64/jdk/hotspot/"
+              "normal/eclipse");
+  ASSERT_TRUE(jdk.GetArchiveFilename("jdk-17.0.1+12", PlatformType::Windows, ArchitectureType::X64) ==
+              "openjdk-jdk-17.0.1+12-x64.zip");
+
+  // macOS ARM64
+  ASSERT_TRUE(jdk.GetDownloadUrl("jdk-17.0.1+12", PlatformType::macOS, ArchitectureType::Arm64) ==
+              "https://api.adoptium.net/v3/binary/version/jdk-17.0.1+12/mac/aarch64/jdk/hotspot/"
+              "normal/eclipse");
+  ASSERT_TRUE(jdk.GetArchiveFilename("jdk-17.0.1+12", PlatformType::macOS, ArchitectureType::Arm64) ==
+              "openjdk-jdk-17.0.1+12-aarch64.tar.gz");
+
+  // Linux ARM64
+  ASSERT_TRUE(jdk.GetDownloadUrl("jdk-17.0.1+12", PlatformType::Linux, ArchitectureType::Arm64) ==
+              "https://api.adoptium.net/v3/binary/version/jdk-17.0.1+12/linux/aarch64/jdk/hotspot/"
+              "normal/eclipse");
+  ASSERT_TRUE(jdk.GetArchiveFilename("jdk-17.0.1+12", PlatformType::Linux, ArchitectureType::Arm64) ==
+              "openjdk-jdk-17.0.1+12-aarch64.tar.xz");
+}
+
 } // namespace CatUpdate

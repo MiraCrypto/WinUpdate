@@ -26,6 +26,16 @@ std::string GetOsQueryString(PlatformType platform) {
   }
   return "linux";
 }
+
+std::string GetAdoptiumArchString(ArchitectureType arch) {
+  switch (arch) {
+  case ArchitectureType::X64:
+    return "x64";
+  case ArchitectureType::Arm64:
+    return "aarch64";
+  }
+  return "x64";
+}
 } // namespace
 
 // Helper to perform remote fetches and parse them safely
@@ -53,7 +63,9 @@ bool NodeJsPackageProvider::IsPlatformSupported(PlatformType /*platform*/, Archi
   return true;
 }
 
-std::vector<PackageVersion> NodeJsPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
+std::vector<PackageVersion> NodeJsPackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                          PlatformType /*targetPlatform*/,
+                                                                          ArchitectureType /*targetArch*/) {
   std::vector<PackageVersion> versions;
   const std::string rawJson = FetchRemoteJson(httpClient, "https://nodejs.org/dist/index.json");
   if (rawJson.empty()) {
@@ -108,7 +120,9 @@ bool VSCodiumPackageProvider::IsPlatformSupported(PlatformType /*platform*/, Arc
   return true;
 }
 
-std::vector<PackageVersion> VSCodiumPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
+std::vector<PackageVersion> VSCodiumPackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                            PlatformType /*targetPlatform*/,
+                                                                            ArchitectureType /*targetArch*/) {
   std::vector<PackageVersion> versions;
   const std::string rawJson = FetchRemoteJson(httpClient, "https://api.github.com/repos/VSCodium/vscodium/releases");
   if (rawJson.empty()) {
@@ -159,7 +173,9 @@ bool PythonPackageProvider::IsPlatformSupported(PlatformType platform, Architect
   return platform == PlatformType::Windows;
 }
 
-std::vector<PackageVersion> PythonPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
+std::vector<PackageVersion> PythonPackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                          PlatformType /*targetPlatform*/,
+                                                                          ArchitectureType /*targetArch*/) {
   std::vector<PackageVersion> versions;
   try {
     std::string const queryUrl = "https://api-v2v3search-0.nuget.org/autocomplete?id=python&prerelease=false";
@@ -211,14 +227,17 @@ bool OpenJdkPackageProvider::IsPlatformSupported(PlatformType /*platform*/, Arch
   return true;
 }
 
-std::vector<PackageVersion> OpenJdkPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
+std::vector<PackageVersion> OpenJdkPackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                           PlatformType targetPlatform,
+                                                                           ArchitectureType targetArch) {
   std::vector<PackageVersion> versions;
-  const std::string osQuery = GetOsQueryString(PlatformTraits::GetPlatformType());
+  const std::string osQuery = GetOsQueryString(targetPlatform);
+  const std::string archQuery = GetAdoptiumArchString(targetArch);
 
   const std::string queryUrl = std::format("https://api.adoptium.net/v3/info/"
                                            "release_names?project=jdk&vendor=eclipse&heap_size=normal&"
-                                           "image_type=jdk&architecture=x64&os={}",
-                                           osQuery);
+                                           "image_type=jdk&architecture={0}&os={1}",
+                                           archQuery, osQuery);
 
   const std::string rawJson = FetchRemoteJson(httpClient, queryUrl);
   if (rawJson.empty()) {
@@ -241,15 +260,16 @@ std::vector<PackageVersion> OpenJdkPackageProvider::FetchAvailableVersions(HttpC
 UrlString OpenJdkPackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType platform,
                                                  ArchitectureType arch) const {
   const std::string osQuery = GetOsQueryString(platform);
-  const std::string archQuery = (arch == ArchitectureType::Arm64) ? "aarch64" : "x64";
+  const std::string archQuery = GetAdoptiumArchString(arch);
   return std::format("https://api.adoptium.net/v3/binary/version/{0}/{1}/{2}/jdk/hotspot/normal/eclipse", version,
                      osQuery, archQuery);
 }
 
-std::string OpenJdkPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType /*platform*/,
+std::string OpenJdkPackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                                        ArchitectureType arch) const {
-  const std::string archStr = (arch == ArchitectureType::Arm64) ? "aarch64" : "x64";
-  return std::format("openjdk-{}-{}.zip", version, archStr);
+  const std::string archStr = GetAdoptiumArchString(arch);
+  const std::string ext = PlatformTraits::GetArchiveExtension(platform, arch);
+  return std::format("openjdk-{}-{}{}", version, archStr, ext);
 }
 
 // -----------------------------------------------------------------------------
@@ -268,7 +288,9 @@ bool GitPackageProvider::IsPlatformSupported(PlatformType platform, Architecture
   return platform == PlatformType::Windows;
 }
 
-std::vector<PackageVersion> GitPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
+std::vector<PackageVersion> GitPackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                       PlatformType /*targetPlatform*/,
+                                                                       ArchitectureType /*targetArch*/) {
   std::vector<PackageVersion> versions;
   const std::string rawJson = FetchRemoteJson(httpClient, "https://api.github.com/repos/git-for-windows/git/releases");
   if (rawJson.empty()) {
@@ -323,7 +345,9 @@ bool VimPackageProvider::IsPlatformSupported(PlatformType platform, Architecture
   return platform == PlatformType::Windows;
 }
 
-std::vector<PackageVersion> VimPackageProvider::FetchAvailableVersions(HttpClient& httpClient) {
+std::vector<PackageVersion> VimPackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                       PlatformType /*targetPlatform*/,
+                                                                       ArchitectureType /*targetArch*/) {
   std::vector<PackageVersion> versions;
   const std::string rawJson =
       FetchRemoteJson(httpClient, "https://api.github.com/repos/vim/vim-win32-installer/releases");

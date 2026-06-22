@@ -233,7 +233,7 @@ int CommandLineInterface::ExecuteInfoCommand(const std::string& packageId, Platf
   auto httpClient = HttpClientFactory::CreateDefaultClient();
 
   std::cout << COLOR_CYAN << "Fetching version info for " << provider->GetDisplayName() << "..." << COLOR_RESET << '\n';
-  auto versions = provider->FetchAvailableVersions(*httpClient);
+  auto versions = provider->FetchAvailableVersions(*httpClient, targetPlatform, targetArch);
 
   std::cout << COLOR_BOLD << "Package ID:   " << COLOR_RESET << provider->GetIdentifier() << '\n';
   std::cout << COLOR_BOLD << "Name:         " << COLOR_RESET << provider->GetDisplayName() << '\n';
@@ -285,7 +285,7 @@ int CommandLineInterface::ExecuteInstallCommand(const std::string& packageId, co
   if (targetVersion.empty()) {
     std::cout << COLOR_CYAN << "Retrieving latest version for " << provider->GetDisplayName() << "..." << COLOR_RESET
               << '\n';
-    auto versions = provider->FetchAvailableVersions(*httpClient);
+    auto versions = provider->FetchAvailableVersions(*httpClient, targetPlatform, targetArch);
     if (versions.empty()) {
       std::cerr << COLOR_RED << "Error: Failed to query remote version registry." << COLOR_RESET << '\n';
       return 1;
@@ -354,7 +354,7 @@ int CommandLineInterface::ExecuteDownloadCommand(const std::string& packageId, c
   if (targetVersion.empty()) {
     std::cout << COLOR_CYAN << "Retrieving latest version for " << provider->GetDisplayName() << "..." << COLOR_RESET
               << '\n';
-    auto versions = provider->FetchAvailableVersions(*httpClient);
+    auto versions = provider->FetchAvailableVersions(*httpClient, targetPlatform, targetArch);
     if (versions.empty()) {
       std::cerr << COLOR_RED << "Error: Failed to query remote version registry." << COLOR_RESET << '\n';
       return 1;

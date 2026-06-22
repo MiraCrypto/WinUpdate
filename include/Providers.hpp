@@ -34,7 +34,9 @@ public:
   /**
    * Fetches the list of available version tags from remote APIs.
    */
-  virtual std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) = 0;
+  virtual std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) = 0;
 
   /**
    * Computes the direct download URL for a given version and target.
@@ -74,7 +76,9 @@ public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
   bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
-  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
   UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
   std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                  ArchitectureType arch) const override;
@@ -88,7 +92,9 @@ public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
   bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
-  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
   UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
   std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                  ArchitectureType arch) const override;
@@ -102,7 +108,9 @@ public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
   bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
-  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
   UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
   std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                  ArchitectureType arch) const override;
@@ -117,7 +125,9 @@ public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
   bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
-  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
   UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
   std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                  ArchitectureType arch) const override;
@@ -131,7 +141,9 @@ public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
   bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
-  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
   UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
   std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                  ArchitectureType arch) const override;
@@ -145,7 +157,9 @@ public:
   PackageIdentifier GetIdentifier() const override;
   PackageName GetDisplayName() const override;
   bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
-  std::vector<PackageVersion> FetchAvailableVersions(HttpClient& httpClient) override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
   UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
   std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                  ArchitectureType arch) const override;
