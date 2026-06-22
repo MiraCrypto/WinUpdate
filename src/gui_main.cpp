@@ -23,6 +23,7 @@
 #include <commctrl.h>
 #include <objbase.h>
 #include <shlobj.h>
+#include <shobjidl.h>
 
 #include "HttpClient.hpp"
 #include "ProcessExecutor.hpp"
@@ -41,6 +42,13 @@ namespace CatUpdate {
 
 int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   m_hinstance = hinstance;
+
+  // Initialize COM for modern Explorer folder picker
+  HRESULT const comInitResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+  if (FAILED(comInitResult)) {
+    SystemLogger::LogError("Failed to initialize COM library.");
+    return 1;
+  }
 
   // Initialize Common Controls
   INITCOMMONCONTROLSEX commonControlsInitEx;
@@ -128,6 +136,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
     DeleteObject(m_backgroundBrush);
   }
 
+  CoUninitialize();
   return static_cast<int>(windowMessage.wParam);
 }
 
@@ -451,9 +460,7 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
 
 void DesktopUserInterface::RefreshInstalledList() {
   m_isExecutingBackgroundAction = false;
-  EnableWindow(m_packageListView, TRUE);
   EnableWindow(m_changePathButton, TRUE);
-  EnableWindow(m_versionComboBox, TRUE);
 
   ListView_DeleteAllItems(m_packageListView);
   m_selectedPackageIndex = -1;
@@ -491,6 +498,9 @@ void DesktopUserInterface::RefreshInstalledList() {
 }
 
 void DesktopUserInterface::OnPackageSelectionChanged() {
+  if (m_isExecutingBackgroundAction) {
+    return;
+  }
   int const selectedIndex = ListView_GetNextItem(m_packageListView, -1, LVNI_SELECTED);
   if (selectedIndex == -1 || selectedIndex == m_selectedPackageIndex) {
     return;
@@ -571,9 +581,7 @@ void DesktopUserInterface::TriggerInstallation() {
   SetWindowTextW(m_statusStatusBar, L"Status: Starting download sequence...");
   EnableWindow(m_installButton, FALSE);
   EnableWindow(m_uninstallButton, FALSE);
-  EnableWindow(m_packageListView, FALSE);
   EnableWindow(m_changePathButton, FALSE);
-  EnableWindow(m_versionComboBox, FALSE);
 
   // Execute installation workflow in background thread using core PackageManager
   std::thread([packageIndex, version]() {
@@ -618,29 +626,49 @@ void DesktopUserInterface::TriggerInstallation() {
 }
 
 void DesktopUserInterface::TriggerPathChange() {
-  BROWSEINFOW folderBrowseInfo = {.hwndOwner = nullptr};
-  folderBrowseInfo.hwndOwner = m_mainWindow;
-  folderBrowseInfo.lpszTitle = L"Select No-Admin Installation Directory";
-  folderBrowseInfo.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+  IFileOpenDialog* fileOpenDialog = nullptr;
+  HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fileOpenDialog));
 
-  LPITEMIDLIST pidl = SHBrowseForFolderW(&folderBrowseInfo);
-  if (pidl != nullptr) {
-    wchar_t selectedPath[MAX_PATH];
-    if (SHGetPathFromIDListW(pidl, selectedPath) != 0) {
-      std::filesystem::path const path(selectedPath);
-
-      // Re-instantiate Manifest at new path
-      m_manifest = std::make_unique<ManifestManager>(path);
-
-      std::wstring const displayPath = L"Installation Path: " + path.wstring();
-      SetWindowTextW(m_pathDisplayEdit, displayPath.c_str());
-
-      AppendLog(L"Installation root path changed to: " + path.wstring());
-
-      RefreshInstalledList();
-      SetWindowTextW(m_statusStatusBar, L"Status: Target installation directory changed.");
+  if (SUCCEEDED(hr)) {
+    DWORD options;
+    if (SUCCEEDED(fileOpenDialog->GetOptions(&options))) {
+      fileOpenDialog->SetOptions(options | FOS_PICKFOLDERS);
     }
-    CoTaskMemFree(pidl);
+
+    fileOpenDialog->SetTitle(L"Select No-Admin Installation Directory");
+
+    // Pre-set the dialog to open at the current installation path
+    std::wstring const currentPath = m_manifest->GetInstallationRootDirectory().wstring();
+    IShellItem* defaultFolderItem = nullptr;
+    if (SUCCEEDED(SHCreateItemFromParsingName(currentPath.c_str(), nullptr, IID_PPV_ARGS(&defaultFolderItem)))) {
+      fileOpenDialog->SetFolder(defaultFolderItem);
+      defaultFolderItem->Release();
+    }
+
+    if (SUCCEEDED(fileOpenDialog->Show(m_mainWindow))) {
+      IShellItem* resultItem = nullptr;
+      if (SUCCEEDED(fileOpenDialog->GetResult(&resultItem))) {
+        PWSTR folderPath = nullptr;
+        if (SUCCEEDED(resultItem->GetDisplayName(SIGDN_FILESYSPATH, &folderPath))) {
+          std::filesystem::path const path(folderPath);
+
+          // Re-instantiate Manifest at new path
+          m_manifest = std::make_unique<ManifestManager>(path);
+
+          std::wstring const displayPath = L"Installation Path: " + path.wstring();
+          SetWindowTextW(m_pathDisplayEdit, displayPath.c_str());
+
+          AppendLog(L"Installation root path changed to: " + path.wstring());
+
+          RefreshInstalledList();
+          SetWindowTextW(m_statusStatusBar, L"Status: Target installation directory changed.");
+
+          CoTaskMemFree(folderPath);
+        }
+        resultItem->Release();
+      }
+    }
+    fileOpenDialog->Release();
   }
 }
 
@@ -657,9 +685,7 @@ void DesktopUserInterface::TriggerUninstallation() {
   m_isExecutingBackgroundAction = true;
   EnableWindow(m_installButton, FALSE);
   EnableWindow(m_uninstallButton, FALSE);
-  EnableWindow(m_packageListView, FALSE);
   EnableWindow(m_changePathButton, FALSE);
-  EnableWindow(m_versionComboBox, FALSE);
   SetWindowTextW(m_statusStatusBar, L"Status: Starting uninstall sequence...");
 
   // Run uninstallation on background thread using core PackageManager
