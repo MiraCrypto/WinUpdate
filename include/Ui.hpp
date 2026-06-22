@@ -88,6 +88,7 @@ private:
   inline static HFONT m_demosceneFont = nullptr;
   inline static HFONT m_scrollerFont = nullptr;
   inline static HBRUSH m_backgroundBrush = nullptr;
+  inline static HBRUSH m_darkComboBoxBrush = nullptr;
 
   // High-DPI State
   inline static float m_dpiScaleFactor = 1.0f;

@@ -65,6 +65,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
 
   // Dark Space Background brush
   m_backgroundBrush = CreateSolidBrush(RGB(6, 6, 14));
+  m_darkComboBoxBrush = CreateSolidBrush(RGB(12, 12, 25));
   windowClass.hbrBackground = m_backgroundBrush;
   windowClass.lpszClassName = L"CatUpdateMainWindowClass";
 
@@ -134,6 +135,9 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   }
   if (m_backgroundBrush != nullptr) {
     DeleteObject(m_backgroundBrush);
+  }
+  if (m_darkComboBoxBrush != nullptr) {
+    DeleteObject(m_darkComboBoxBrush);
   }
 
   CoUninitialize();
@@ -246,7 +250,7 @@ void DesktopUserInterface::InitializeDemosceneAssets(HWND /*parentWindow*/) {
                                 CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, VARIABLE_PITCH, L"Consolas");
 
   m_scrollerFont = CreateFontW(20, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
-                               CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, FIXED_PITCH, L"Courier New");
+                               CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, FIXED_PITCH, L"Consolas");
 }
 
 // -----------------------------------------------------------------------------
@@ -414,8 +418,15 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
     int const height = rect.bottom;
 
     // Draw gorgeous custom styled Cyberpunk buttons
-    HBRUSH borderBrush = CreateSolidBrush(RGB(0, 240, 255));  // Neon Cyan border
-    HBRUSH interiorBrush = CreateSolidBrush(RGB(12, 12, 25)); // Dark Navy background
+    HBRUSH borderBrush = CreateSolidBrush(RGB(0, 240, 255)); // Neon Cyan border
+    HBRUSH interiorBrush = nullptr;
+
+    bool const isPressed = (SendMessage(hwnd, BM_GETSTATE, 0, 0) & BST_PUSHED) != 0;
+    if (isPressed) {
+      interiorBrush = CreateSolidBrush(RGB(0, 240, 255)); // Invert to full Neon Cyan when pressed
+    } else {
+      interiorBrush = CreateSolidBrush(RGB(12, 12, 25)); // Dark Navy background
+    }
 
     FillRect(hdc, &rect, borderBrush);
 
@@ -434,7 +445,11 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
 
     SetBkMode(hdc, TRANSPARENT);
     if (IsWindowEnabled(hwnd) != 0) {
-      SetTextColor(hdc, RGB(57, 255, 20)); // Bright Neon Green text
+      if (isPressed) {
+        SetTextColor(hdc, RGB(12, 12, 25)); // Dark Navy text on bright Neon Cyan background
+      } else {
+        SetTextColor(hdc, RGB(57, 255, 20)); // Bright Neon Green text
+      }
     } else {
       SetTextColor(hdc, RGB(70, 70, 85)); // Dim grey text
     }
@@ -448,8 +463,21 @@ LRESULT CALLBACK DesktopUserInterface::CustomButtonProc(HWND hwnd, UINT message,
     EndPaint(hwnd, &ps);
     return 0;
   }
+  case WM_LBUTTONDOWN:
+  case WM_LBUTTONUP:
+  case WM_MOUSEMOVE: {
+    // Force immediate redraw when button state changes for responsive hover/click animations
+    LRESULT const result = DefSubclassProc(hwnd, message, wparam, lparam);
+    InvalidateRect(hwnd, nullptr, TRUE);
+    return result;
+  }
   case WM_ERASEBKGND:
     return 1; // Handled
+  case WM_ENABLE:
+  case WM_SETFOCUS:
+  case WM_KILLFOCUS:
+    InvalidateRect(hwnd, nullptr, TRUE);
+    break;
   }
   return DefSubclassProc(hwnd, message, wparam, lparam);
 }
@@ -754,12 +782,73 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
     SetBkMode(hdcStatic, TRANSPARENT);
     return reinterpret_cast<LRESULT>(m_backgroundBrush);
   }
+  case WM_CTLCOLORLISTBOX: {
+    HDC hdcList = reinterpret_cast<HDC>(wparam);
+    SetTextColor(hdcList, RGB(0, 240, 255)); // Neon Cyan text
+    SetBkMode(hdcList, TRANSPARENT);
+    return reinterpret_cast<LRESULT>(m_darkComboBoxBrush);
+  }
   case WM_ERASEBKGND:
     return 1; // Double buffer handles erasing entirely to avoid flicker
   case WM_NOTIFY: {
     auto const* notifyHeader = reinterpret_cast<NMHDR*>(lparam);
     if (notifyHeader->idFrom == 2001 && notifyHeader->code == LVN_ITEMCHANGED) {
       OnPackageSelectionChanged();
+    }
+    // ListView Header Custom Draw to completely eliminate the legacy grey Win98 header bar!
+    if (notifyHeader->code == NM_CUSTOMDRAW) {
+      auto* customDraw = reinterpret_cast<LPNMCUSTOMDRAW>(lparam);
+      HWND const headerHwnd = ListView_GetHeader(m_packageListView);
+      if (customDraw->hdr.hwndFrom == headerHwnd) {
+        switch (customDraw->dwDrawStage) {
+        case CDDS_PREPAINT:
+          return CDRF_NOTIFYITEMDRAW;
+        case CDDS_ITEMPREPAINT: {
+          HDC const hdc = customDraw->hdc;
+          RECT const rect = customDraw->rc;
+
+          // Draw dark navy background
+          HBRUSH bgBrush = CreateSolidBrush(RGB(12, 12, 25));
+          FillRect(hdc, &rect, bgBrush);
+          DeleteObject(bgBrush);
+
+          // Draw a thin neon cyan border at the bottom
+          HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(0, 240, 255));
+          auto* oldPen = static_cast<HPEN>(SelectObject(hdc, borderPen));
+          MoveToEx(hdc, rect.left, rect.bottom - 1, nullptr);
+          LineTo(hdc, rect.right, rect.bottom - 1);
+
+          // Draw column vertical divider on the right
+          MoveToEx(hdc, rect.right - 1, rect.top, nullptr);
+          LineTo(hdc, rect.right - 1, rect.bottom);
+
+          SelectObject(hdc, oldPen);
+          DeleteObject(borderPen);
+
+          // Fetch column text
+          int const columnIndex = static_cast<int>(customDraw->dwItemSpec);
+          WCHAR headerText[128] = L"";
+          HDITEMW headerItem = {};
+          headerItem.mask = HDI_TEXT;
+          headerItem.pszText = headerText;
+          headerItem.cchTextMax = 128;
+          Header_GetItem(headerHwnd, columnIndex, &headerItem);
+
+          // Draw text in Neon Cyan
+          auto* defaultSystemFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+          auto* oldFont = static_cast<HFONT>(SelectObject(hdc, defaultSystemFont));
+          SetTextColor(hdc, RGB(0, 240, 255));
+          SetBkMode(hdc, TRANSPARENT);
+
+          RECT textRect = rect;
+          textRect.left += 6; // Padding
+          DrawTextW(hdc, headerText, -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+          SelectObject(hdc, oldFont);
+          return CDRF_SKIPDEFAULT; // Avoid standard Windows theme painting!
+        }
+        }
+      }
     }
     break;
   }
