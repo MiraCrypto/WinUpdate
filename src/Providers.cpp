@@ -234,9 +234,9 @@ std::vector<PackageVersion> OpenJdkPackageProvider::FetchAvailableVersions(HttpC
   const std::string osQuery = GetOsQueryString(targetPlatform);
   const std::string archQuery = GetAdoptiumArchString(targetArch);
 
-  const std::string queryUrl = std::format("https://api.adoptium.net/v3/info/"
+  std::string const queryUrl = std::format("https://api.adoptium.net/v3/info/"
                                            "release_names?project=jdk&vendor=eclipse&heap_size=normal&"
-                                           "image_type=jdk&architecture={0}&os={1}",
+                                           "image_type=jdk&release_type=ga&page_size=20&architecture={0}&os={1}",
                                            archQuery, osQuery);
 
   const std::string rawJson = FetchRemoteJson(httpClient, queryUrl);
