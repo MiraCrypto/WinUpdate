@@ -105,6 +105,48 @@ std::string NodeJsPackageProvider::GetArchiveFilename(const PackageVersion& vers
 }
 
 // -----------------------------------------------------------------------------
+// Node.js (LTS only) Provider Implementation
+// -----------------------------------------------------------------------------
+
+PackageIdentifier NodeJsLtsPackageProvider::GetIdentifier() const {
+  return "nodejs-lts";
+}
+
+PackageName NodeJsLtsPackageProvider::GetDisplayName() const {
+  return "Node.js (LTS)";
+}
+
+std::vector<PackageVersion> NodeJsLtsPackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                             PlatformType /*targetPlatform*/,
+                                                                             ArchitectureType /*targetArch*/) {
+  std::vector<PackageVersion> versions;
+  const std::string rawJson = FetchRemoteJson(httpClient, "https://nodejs.org/dist/index.json");
+  if (rawJson.empty()) {
+    return versions;
+  }
+
+  try {
+    auto parsedData = nlohmann::json::parse(rawJson);
+    for (const auto& item : parsedData) {
+      bool isLts = false;
+      if (item.contains("lts")) {
+        const auto& ltsVal = item["lts"];
+        if (ltsVal.is_string() || (ltsVal.is_boolean() && ltsVal.get<bool>())) {
+          isLts = true;
+        }
+      }
+
+      if (isLts) {
+        versions.push_back(item.value("version", ""));
+      }
+    }
+  } catch (const std::exception& ex) {
+    SystemLogger::LogError("Exception parsing Node.js LTS releases JSON", ex.what());
+  }
+  return versions;
+}
+
+// -----------------------------------------------------------------------------
 // VSCodium Provider Implementation
 // -----------------------------------------------------------------------------
 
@@ -273,6 +315,50 @@ std::string OpenJdkPackageProvider::GetArchiveFilename(const PackageVersion& ver
 }
 
 // -----------------------------------------------------------------------------
+// Eclipse Temurin OpenJDK (LTS only) Provider Implementation
+// -----------------------------------------------------------------------------
+
+PackageIdentifier OpenJdkLtsPackageProvider::GetIdentifier() const {
+  return "jdk-lts";
+}
+
+PackageName OpenJdkLtsPackageProvider::GetDisplayName() const {
+  return "OpenJDK (Temurin) (LTS)";
+}
+
+std::vector<PackageVersion> OpenJdkLtsPackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                              PlatformType targetPlatform,
+                                                                              ArchitectureType targetArch) {
+  std::vector<PackageVersion> versions;
+  const std::string osQuery = GetOsQueryString(targetPlatform);
+  const std::string archQuery = GetAdoptiumArchString(targetArch);
+
+  // Query with &lts=true to fetch ONLY stable LTS releases from Adoptium!
+  std::string const queryUrl =
+      std::format("https://api.adoptium.net/v3/info/"
+                  "release_names?project=jdk&vendor=eclipse&heap_size=normal&"
+                  "image_type=jdk&release_type=ga&lts=true&page_size=20&architecture={0}&os={1}",
+                  archQuery, osQuery);
+
+  const std::string rawJson = FetchRemoteJson(httpClient, queryUrl);
+  if (rawJson.empty()) {
+    return versions;
+  }
+
+  try {
+    auto parsedData = nlohmann::json::parse(rawJson);
+    if (parsedData.contains("releases") && parsedData["releases"].is_array()) {
+      for (const auto& item : parsedData["releases"]) {
+        versions.push_back(item.get<std::string>());
+      }
+    }
+  } catch (const std::exception& ex) {
+    SystemLogger::LogError("Exception parsing OpenJDK LTS releases JSON", ex.what());
+  }
+  return versions;
+}
+
+// -----------------------------------------------------------------------------
 // Git Provider Implementation (Windows-only)
 // -----------------------------------------------------------------------------
 
@@ -391,9 +477,11 @@ std::vector<std::unique_ptr<PackageProvider>> PackageProviderRegistry::GetRegist
   std::vector<std::unique_ptr<PackageProvider>> providers;
 
   providers.push_back(std::make_unique<NodeJsPackageProvider>());
+  providers.push_back(std::make_unique<NodeJsLtsPackageProvider>());
   providers.push_back(std::make_unique<VSCodiumPackageProvider>());
   providers.push_back(std::make_unique<PythonPackageProvider>());
   providers.push_back(std::make_unique<OpenJdkPackageProvider>());
+  providers.push_back(std::make_unique<OpenJdkLtsPackageProvider>());
   providers.push_back(std::make_unique<GitPackageProvider>());
   providers.push_back(std::make_unique<VimPackageProvider>());
 

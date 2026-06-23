@@ -85,6 +85,18 @@ public:
 };
 
 /**
+ * Package provider for Node.js (LTS releases only).
+ */
+class NodeJsLtsPackageProvider : public NodeJsPackageProvider {
+public:
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
+};
+
+/**
  * Package provider for VSCodium.
  */
 class VSCodiumPackageProvider : public BasePackageProvider {
@@ -131,6 +143,18 @@ public:
   UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
   std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
                                  ArchitectureType arch) const override;
+};
+
+/**
+ * Package provider for Eclipse Temurin OpenJDK (LTS releases only).
+ */
+class OpenJdkLtsPackageProvider : public OpenJdkPackageProvider {
+public:
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
 };
 
 /**

@@ -8,23 +8,29 @@ TEST(ProvidersTest, RegistryInitialization) {
   auto providers = PackageProviderRegistry::GetRegisteredProviders();
   ASSERT_FALSE(providers.empty());
 
-  // Check that all 6 providers are registered in the registry
+  // Check that all 8 providers (including LTS variants) are registered in the registry
   bool hasNodeJs = false;
+  bool hasNodeJsLts = false;
   bool hasVscodium = false;
   bool hasPython = false;
   bool hasOpenJdk = false;
+  bool hasOpenJdkLts = false;
   bool hasGit = false;
   bool hasVim = false;
 
   for (const auto& provider : providers) {
     if (provider->GetIdentifier() == "nodejs") {
       hasNodeJs = true;
+    } else if (provider->GetIdentifier() == "nodejs-lts") {
+      hasNodeJsLts = true;
     } else if (provider->GetIdentifier() == "vscodium") {
       hasVscodium = true;
     } else if (provider->GetIdentifier() == "python") {
       hasPython = true;
     } else if (provider->GetIdentifier() == "jdk") {
       hasOpenJdk = true;
+    } else if (provider->GetIdentifier() == "jdk-lts") {
+      hasOpenJdkLts = true;
     } else if (provider->GetIdentifier() == "git") {
       hasGit = true;
     } else if (provider->GetIdentifier() == "vim") {
@@ -33,9 +39,11 @@ TEST(ProvidersTest, RegistryInitialization) {
   }
 
   ASSERT_TRUE(hasNodeJs);
+  ASSERT_TRUE(hasNodeJsLts);
   ASSERT_TRUE(hasVscodium);
   ASSERT_TRUE(hasPython);
   ASSERT_TRUE(hasOpenJdk);
+  ASSERT_TRUE(hasOpenJdkLts);
   ASSERT_TRUE(hasGit);
   ASSERT_TRUE(hasVim);
 }
