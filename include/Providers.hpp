@@ -69,7 +69,7 @@ protected:
 };
 
 /**
- * Package provider for Node.js (LTS releases).
+ * Package provider for Node.js.
  */
 class NodeJsPackageProvider : public BasePackageProvider {
 public:

@@ -56,7 +56,7 @@ PackageIdentifier NodeJsPackageProvider::GetIdentifier() const {
 }
 
 PackageName NodeJsPackageProvider::GetDisplayName() const {
-  return "Node.js (LTS)";
+  return "Node.js";
 }
 
 bool NodeJsPackageProvider::IsPlatformSupported(PlatformType /*platform*/, ArchitectureType /*arch*/) const {
