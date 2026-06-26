@@ -80,7 +80,7 @@ private:
   // Demoscene Animation State
   inline static std::vector<RetroStarParticle> m_starfield;
   inline static std::wstring m_tickerText =
-      L"  ***  CATUPDATE SOFTWARE CENTER  ***  WITHOUT ADMIN OR SUDO  ***  EVOLVED WITH 1000:1 "
+      L"  ***  SOFTWARE CENTER  ***  WITHOUT ADMIN OR SUDO  ***  EVOLVED WITH 1000:1 "
       L"READABILITY-FIRST METHODOLOGY  ***  CYBERPUNK RETRO DEMOSCENE TRON EDITION  ***  STAY "
       L"NATIVE, STAY COMPILED!  ***  ";
   inline static float m_tickerScrollOffset = 0.0f;

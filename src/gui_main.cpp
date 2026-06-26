@@ -75,7 +75,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   }
 
   // Create the Main Window
-  m_mainWindow = CreateWindowExW(WS_EX_APPWINDOW, L"CatUpdateMainWindowClass", L"CatUpdate - No-Admin Software Center",
+  m_mainWindow = CreateWindowExW(WS_EX_APPWINDOW, L"CatUpdateMainWindowClass", L"Software Center - No-Admin",
                                  WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT,
                                  800, 650, nullptr, nullptr, hinstance, nullptr);
 
@@ -116,7 +116,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   SetTimer(m_mainWindow, 1001, 25, nullptr);
 
   // Log startup sequence
-  AppendLog(L"CatUpdate GUI initialized.");
+  AppendLog(L"Software Center GUI initialized.");
   AppendLog(L"Default installation root: " + defaultRootDirectory.wstring());
 
   // Main message dispatch loop
@@ -319,9 +319,9 @@ void DesktopUserInterface::PaintDemosceneScreen(HWND hwnd, HDC hdc) {
 
   // Draw header text with glowing shadow effect
   SetTextColor(memoryDeviceContext, RGB(120, 0, 220));
-  TextOutW(memoryDeviceContext, 22, 18, L"*** CATUPDATE SOFTWARE CENTER ***", 33);
+  TextOutW(memoryDeviceContext, 22, 18, L"*** SOFTWARE CENTER ***", 23);
   SetTextColor(memoryDeviceContext, RGB(0, 240, 255));
-  TextOutW(memoryDeviceContext, 20, 16, L"*** CATUPDATE SOFTWARE CENTER ***", 33);
+  TextOutW(memoryDeviceContext, 20, 16, L"*** SOFTWARE CENTER ***", 23);
 
   // 5. Render the sinusoidal waving text scroller at the bottom
   SelectObject(memoryDeviceContext, m_scrollerFont);

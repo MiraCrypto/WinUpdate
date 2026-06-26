@@ -35,8 +35,8 @@ public:
     std::wstring const urlPath(urlComponents.lpszUrlPath,
                                urlComponents.dwUrlPathLength + urlComponents.dwExtraInfoLength);
 
-    HINTERNET sessionHandle = WinHttpOpen(L"CatUpdate/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
-                                          WINHTTP_NO_PROXY_BYPASS, 0);
+    HINTERNET sessionHandle = WinHttpOpen(L"SoftwareCenter/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                          WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (sessionHandle == nullptr) {
       SystemLogger::LogError("WinHttpOpen failed.");
       return false;
@@ -143,8 +143,8 @@ public:
     std::wstring const urlPath(urlComponents.lpszUrlPath,
                                urlComponents.dwUrlPathLength + urlComponents.dwExtraInfoLength);
 
-    HINTERNET sessionHandle = WinHttpOpen(L"CatUpdate/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
-                                          WINHTTP_NO_PROXY_BYPASS, 0);
+    HINTERNET sessionHandle = WinHttpOpen(L"SoftwareCenter/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                          WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (sessionHandle == nullptr) {
       return "";
     }
@@ -165,7 +165,7 @@ public:
     }
 
     // Set custom User-Agent headers for GitHub Releases API
-    std::wstring const headers = L"User-Agent: CatUpdate/1.0\r\n";
+    std::wstring const headers = L"User-Agent: SoftwareCenter/1.0\r\n";
     WinHttpAddRequestHeaders(requestHandle, headers.c_str(), static_cast<DWORD>(-1),
                              WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE);
 

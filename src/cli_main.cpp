@@ -145,7 +145,7 @@ int CommandLineInterface::Run(const std::vector<std::string>& arguments) {
 }
 
 void CommandLineInterface::PrintUsage() {
-  std::cout << COLOR_CYAN << "=== CatUpdate Software Center CLI ===" << COLOR_RESET << '\n';
+  std::cout << COLOR_CYAN << "=== Software Center CLI ===" << COLOR_RESET << '\n';
   std::cout << COLOR_BOLD << "Usage:" << COLOR_RESET << '\n';
   std::cout << "  catupdate <command> [arguments]" << '\n' << '\n';
   std::cout << COLOR_BOLD << "Commands:" << COLOR_RESET << '\n';

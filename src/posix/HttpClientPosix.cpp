@@ -31,7 +31,7 @@ public:
   }
 
   std::string FetchStringContent(const UrlString& sourceUrl) override {
-    const std::vector<std::string> command = {"curl", "-L", "-s", "-A", "CatUpdate/1.0", sourceUrl};
+    const std::vector<std::string> command = {"curl", "-L", "-s", "-A", "SoftwareCenter/1.0", sourceUrl};
 
     auto executionResult = ProcessExecutor::ExecuteCommand(command);
     if (executionResult && executionResult->exitCode == 0) {
