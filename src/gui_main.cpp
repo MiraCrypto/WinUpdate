@@ -934,7 +934,7 @@ void DesktopUserInterface::PopulatePathComboBox() {
   m_predefinedPaths.clear();
   m_predefinedPaths.push_back(PathResolver::GetDefaultInstallationRootPath());
   m_predefinedPaths.push_back(PathResolver::GetLocalAppDirectory() / "SoftwareCenter");
-  m_predefinedPaths.push_back(PathResolver::GetUserHomeDirectory() / "SoftwareCenter");
+  m_predefinedPaths.push_back(PathResolver::GetUserDocumentsDirectory());
 
   std::filesystem::path const currentPath = m_manifest->GetInstallationRootDirectory();
   int selectedIndex = -1;
@@ -967,7 +967,7 @@ void DesktopUserInterface::PopulatePathComboBox() {
   itemText = L"Local AppData (" + m_predefinedPaths[1].wstring() + L")";
   SendMessage(m_pathComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(itemText.c_str()));
 
-  itemText = L"User Profile (" + m_predefinedPaths[2].wstring() + L")";
+  itemText = L"Documents (" + m_predefinedPaths[2].wstring() + L")";
   SendMessage(m_pathComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(itemText.c_str()));
 
   if (m_predefinedPaths.size() > 3) {

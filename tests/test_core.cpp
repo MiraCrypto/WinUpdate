@@ -38,6 +38,17 @@ TEST(PathResolverTest, LocalAppDirectoryResolution) {
 #endif
 }
 
+TEST(PathResolverTest, UserDocumentsDirectoryResolution) {
+  auto docsDir = PathResolver::GetUserDocumentsDirectory();
+  ASSERT_FALSE(docsDir.empty());
+#ifdef _WIN32
+  std::string const pathStr = docsDir.string();
+  ASSERT_TRUE(pathStr.find("Documents") != std::string::npos);
+#else
+  ASSERT_TRUE(docsDir.filename() == "Documents");
+#endif
+}
+
 TEST(ManifestManagerTest, SaveAndLoadCycle) {
   // Create localized temporary sandbox inside workspace for deterministic testing
   const std::filesystem::path sandboxDir = std::filesystem::current_path() / "test_sandbox";

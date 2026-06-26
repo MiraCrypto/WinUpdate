@@ -85,6 +85,11 @@ public:
    * Resolves the user-specific Local AppData directory.
    */
   static std::filesystem::path GetLocalAppDirectory();
+
+  /**
+   * Resolves the personal Documents directory of the current user.
+   */
+  static std::filesystem::path GetUserDocumentsDirectory();
 };
 
 /**
