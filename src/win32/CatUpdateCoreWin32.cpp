@@ -36,6 +36,15 @@ std::filesystem::path PathResolver::GetUserHomeDirectory() {
   return std::filesystem::path("C:\\Users\\Default");
 }
 
+std::filesystem::path PathResolver::GetLocalAppDirectory() {
+  WCHAR localAppDataPath[MAX_PATH];
+  HRESULT const result = SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, localAppDataPath);
+  if (SUCCEEDED(result)) {
+    return std::filesystem::path(localAppDataPath);
+  }
+  return GetUserHomeDirectory() / "AppData" / "Local";
+}
+
 // -----------------------------------------------------------------------------
 // Utils Windows Implementation (MultiByteToWideChar conversions)
 // -----------------------------------------------------------------------------

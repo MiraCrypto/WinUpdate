@@ -30,6 +30,10 @@ std::filesystem::path PathResolver::GetUserHomeDirectory() {
   return {"/"};
 }
 
+std::filesystem::path PathResolver::GetLocalAppDirectory() {
+  return GetUserHomeDirectory() / ".local" / "share";
+}
+
 // -----------------------------------------------------------------------------
 // Utils POSIX Implementation (String stubs)
 // -----------------------------------------------------------------------------

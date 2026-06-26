@@ -80,6 +80,11 @@ public:
    * Resolves the absolute home directory of the current user.
    */
   static std::filesystem::path GetUserHomeDirectory();
+
+  /**
+   * Resolves the user-specific Local AppData directory.
+   */
+  static std::filesystem::path GetLocalAppDirectory();
 };
 
 /**

@@ -27,6 +27,17 @@ TEST(PathResolverTest, DefaultInstallPathResolution) {
 #endif
 }
 
+TEST(PathResolverTest, LocalAppDirectoryResolution) {
+  auto localAppDir = PathResolver::GetLocalAppDirectory();
+  ASSERT_FALSE(localAppDir.empty());
+#ifdef _WIN32
+  std::string const pathStr = localAppDir.string();
+  ASSERT_TRUE(pathStr.find("AppData") != std::string::npos || pathStr.find("Local") != std::string::npos);
+#else
+  ASSERT_TRUE(localAppDir.filename() == "share");
+#endif
+}
+
 TEST(ManifestManagerTest, SaveAndLoadCycle) {
   // Create localized temporary sandbox inside workspace for deterministic testing
   const std::filesystem::path sandboxDir = std::filesystem::current_path() / "test_sandbox";

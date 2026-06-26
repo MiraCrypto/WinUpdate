@@ -45,9 +45,12 @@ private:
 
   // UI thread safety callbacks & event handlers
   static void OnPackageSelectionChanged();
+  static void OnPathSelectionChanged();
   static void TriggerInstallation();
   static void TriggerUninstallation();
-  static void TriggerPathChange();
+  static std::optional<std::filesystem::path> TriggerPathChange();
+  static void PopulatePathComboBox();
+  static void UpdateInstallationPath(const std::filesystem::path& newPath);
   static void RefreshInstalledList();
   static void AppendLog(const std::wstring& message);
 
@@ -65,7 +68,9 @@ private:
   inline static HWND m_uninstallButton = nullptr;
   inline static HWND m_changePathButton = nullptr;
   inline static HWND m_statusStatusBar = nullptr;
-  inline static HWND m_pathDisplayEdit = nullptr;
+  inline static HWND m_pathComboBox = nullptr;
+  inline static std::vector<std::filesystem::path> m_predefinedPaths;
+  inline static int m_previousPathSelectedIndex = 0;
   inline static HWND m_consoleLogEdit = nullptr;
 
   inline static std::unique_ptr<ManifestManager> m_manifest;

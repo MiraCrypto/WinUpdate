@@ -101,10 +101,8 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   InitializeDemosceneAssets(m_mainWindow);
   RecalculateLayoutAndDpi(m_mainWindow);
 
-  // Display Current Installation Path
-  std::wstring const displayPath = L"Installation Path: " + defaultRootDirectory.wstring();
-  SetWindowTextW(m_pathDisplayEdit, displayPath.c_str());
-  SetWindowTextW(m_changePathButton, L"Change Path");
+  // Display Current Installation Path options
+  PopulatePathComboBox();
 
   RefreshInstalledList();
 
@@ -190,22 +188,22 @@ void DesktopUserInterface::CreateControls(HWND parentWindow) {
 
   // Custom Cyberpunk Styled Buttons
   m_installButton = CreateWindowExW(0, WC_BUTTON, L"INSTALL / UPDATE", WS_CHILD | WS_VISIBLE | WS_DISABLED, 235, 335,
-                                    180, 30, parentWindow, reinterpret_cast<HMENU>(2003), m_hinstance, nullptr);
+                                    250, 30, parentWindow, reinterpret_cast<HMENU>(2003), m_hinstance, nullptr);
   SetWindowSubclass(m_installButton, CustomButtonProc, 1, 0);
 
-  m_changePathButton = CreateWindowExW(0, WC_BUTTON, L"CHANGE PATH", WS_CHILD | WS_VISIBLE, 430, 335, 150, 30,
-                                       parentWindow, reinterpret_cast<HMENU>(2004), m_hinstance, nullptr);
-  SetWindowSubclass(m_changePathButton, CustomButtonProc, 2, 0);
-
-  m_uninstallButton = CreateWindowExW(0, WC_BUTTON, L"UNINSTALL", WS_CHILD | WS_VISIBLE | WS_DISABLED, 595, 335, 170,
+  m_uninstallButton = CreateWindowExW(0, WC_BUTTON, L"UNINSTALL", WS_CHILD | WS_VISIBLE | WS_DISABLED, 500, 335, 265,
                                       30, parentWindow, reinterpret_cast<HMENU>(2005), m_hinstance, nullptr);
   SetWindowSubclass(m_uninstallButton, CustomButtonProc, 3, 0);
 
-  // Installation Path Display label
-  m_pathDisplayEdit = CreateWindowExW(0, WC_EDIT, L"Installation Path: ",
-                                      WS_CHILD | WS_VISIBLE | ES_LEFT | ES_READONLY | ES_AUTOHSCROLL | WS_BORDER, 20,
-                                      375, 745, 24, parentWindow, nullptr, m_hinstance, nullptr);
-  SendMessage(m_pathDisplayEdit, WM_SETFONT, reinterpret_cast<WPARAM>(defaultSystemFont), TRUE);
+  // Path Selection ComboBox
+  m_pathComboBox = CreateWindowExW(0, WC_COMBOBOX, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST, 20, 375, 590, 200,
+                                   parentWindow, reinterpret_cast<HMENU>(2007), m_hinstance, nullptr);
+  SendMessage(m_pathComboBox, WM_SETFONT, reinterpret_cast<WPARAM>(defaultSystemFont), TRUE);
+
+  // Browse Path Button next to the ComboBox
+  m_changePathButton = CreateWindowExW(0, WC_BUTTON, L"BROWSE...", WS_CHILD | WS_VISIBLE, 620, 375, 145, 26,
+                                       parentWindow, reinterpret_cast<HMENU>(2004), m_hinstance, nullptr);
+  SetWindowSubclass(m_changePathButton, CustomButtonProc, 2, 0);
 
   // Hacker Terminal Console Log
   m_consoleLogEdit = CreateWindowExW(
@@ -653,7 +651,8 @@ void DesktopUserInterface::TriggerInstallation() {
   }).detach();
 }
 
-void DesktopUserInterface::TriggerPathChange() {
+std::optional<std::filesystem::path> DesktopUserInterface::TriggerPathChange() {
+  std::optional<std::filesystem::path> chosenPath = std::nullopt;
   IFileOpenDialog* fileOpenDialog = nullptr;
   HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fileOpenDialog));
 
@@ -680,19 +679,7 @@ void DesktopUserInterface::TriggerPathChange() {
       if (SUCCEEDED(fileOpenDialog->GetResult(&resultItem))) {
         PWSTR folderPath = nullptr;
         if (SUCCEEDED(resultItem->GetDisplayName(SIGDN_FILESYSPATH, &folderPath))) {
-          std::filesystem::path const path(folderPath);
-
-          // Re-instantiate Manifest at new path
-          m_manifest = std::make_unique<ManifestManager>(path);
-
-          std::wstring const displayPath = L"Installation Path: " + path.wstring();
-          SetWindowTextW(m_pathDisplayEdit, displayPath.c_str());
-
-          AppendLog(L"Installation root path changed to: " + path.wstring());
-
-          RefreshInstalledList();
-          SetWindowTextW(m_statusStatusBar, L"Status: Target installation directory changed.");
-
+          chosenPath = std::filesystem::path(folderPath);
           CoTaskMemFree(folderPath);
         }
         resultItem->Release();
@@ -700,6 +687,7 @@ void DesktopUserInterface::TriggerPathChange() {
     }
     fileOpenDialog->Release();
   }
+  return chosenPath;
 }
 
 void DesktopUserInterface::TriggerUninstallation() {
@@ -859,9 +847,15 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
     if (commandId == 2003) {
       TriggerInstallation();
     } else if (commandId == 2004) {
-      TriggerPathChange();
+      auto const pathOpt = TriggerPathChange();
+      if (pathOpt.has_value()) {
+        UpdateInstallationPath(pathOpt.value());
+        PopulatePathComboBox();
+      }
     } else if (commandId == 2005) {
       TriggerUninstallation();
+    } else if (commandId == 2007 && notificationCode == CBN_SELCHANGE) {
+      OnPathSelectionChanged();
     }
 
     // Threading Messages
@@ -932,6 +926,95 @@ void DesktopUserInterface::AppendLog(const std::wstring& message) {
   int const length = GetWindowTextLengthW(m_consoleLogEdit);
   SendMessage(m_consoleLogEdit, EM_SETSEL, length, length);
   SendMessage(m_consoleLogEdit, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(fullLine.c_str()));
+}
+
+void DesktopUserInterface::PopulatePathComboBox() {
+  SendMessage(m_pathComboBox, CB_RESETCONTENT, 0, 0);
+
+  m_predefinedPaths.clear();
+  m_predefinedPaths.push_back(PathResolver::GetDefaultInstallationRootPath());
+  m_predefinedPaths.push_back(PathResolver::GetLocalAppDirectory() / "SoftwareCenter");
+  m_predefinedPaths.push_back(PathResolver::GetUserHomeDirectory() / "SoftwareCenter");
+
+  std::filesystem::path const currentPath = m_manifest->GetInstallationRootDirectory();
+  int selectedIndex = -1;
+
+  for (int i = 0; i < static_cast<int>(m_predefinedPaths.size()); ++i) {
+    try {
+      if (m_predefinedPaths[i] == currentPath ||
+          (std::filesystem::exists(m_predefinedPaths[i]) && std::filesystem::exists(currentPath) &&
+           std::filesystem::equivalent(m_predefinedPaths[i], currentPath))) {
+        selectedIndex = i;
+        break;
+      }
+    } catch (...) {
+      if (m_predefinedPaths[i] == currentPath) {
+        selectedIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (selectedIndex == -1) {
+    m_predefinedPaths.push_back(currentPath);
+    selectedIndex = static_cast<int>(m_predefinedPaths.size()) - 1;
+  }
+
+  std::wstring itemText;
+  itemText = L"Public Documents (" + m_predefinedPaths[0].wstring() + L")";
+  SendMessage(m_pathComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(itemText.c_str()));
+
+  itemText = L"Local AppData (" + m_predefinedPaths[1].wstring() + L")";
+  SendMessage(m_pathComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(itemText.c_str()));
+
+  itemText = L"User Profile (" + m_predefinedPaths[2].wstring() + L")";
+  SendMessage(m_pathComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(itemText.c_str()));
+
+  if (m_predefinedPaths.size() > 3) {
+    itemText = L"Custom Path (" + m_predefinedPaths[3].wstring() + L")";
+    SendMessage(m_pathComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(itemText.c_str()));
+  }
+
+  SendMessage(m_pathComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"[Browse Custom Path...]"));
+  SendMessage(m_pathComboBox, CB_SETCURSEL, selectedIndex, 0);
+  m_previousPathSelectedIndex = selectedIndex;
+}
+
+void DesktopUserInterface::UpdateInstallationPath(const std::filesystem::path& newPath) {
+  m_manifest = std::make_unique<ManifestManager>(newPath);
+  m_manifest->SaveManifestToFile();
+
+  AppendLog(L"Installation root path changed to: " + newPath.wstring());
+
+  m_versionsCache.clear();
+  RefreshInstalledList();
+
+  m_selectedPackageIndex = -1;
+  SendMessage(m_versionComboBox, CB_RESETCONTENT, 0, 0);
+  EnableWindow(m_installButton, FALSE);
+  EnableWindow(m_uninstallButton, FALSE);
+
+  SetWindowTextW(m_statusStatusBar, L"Status: Target installation directory changed.");
+}
+
+void DesktopUserInterface::OnPathSelectionChanged() {
+  int const selectedIndex = static_cast<int>(SendMessage(m_pathComboBox, CB_GETCURSEL, 0, 0));
+  if (selectedIndex == CB_ERR) {
+    return;
+  }
+
+  int const browseIndex = static_cast<int>(m_predefinedPaths.size());
+
+  if (selectedIndex == browseIndex) {
+    auto const pathOpt = TriggerPathChange();
+    if (pathOpt.has_value()) {
+      UpdateInstallationPath(pathOpt.value());
+    }
+    PopulatePathComboBox();
+  } else if (selectedIndex >= 0 && selectedIndex < static_cast<int>(m_predefinedPaths.size())) {
+    UpdateInstallationPath(m_predefinedPaths[selectedIndex]);
+    m_previousPathSelectedIndex = selectedIndex;
+  }
 }
 
 } // namespace CatUpdate
