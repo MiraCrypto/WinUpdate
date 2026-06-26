@@ -8,10 +8,10 @@ TEST(ProvidersTest, RegistryInitialization) {
   auto providers = PackageProviderRegistry::GetRegisteredProviders();
   ASSERT_FALSE(providers.empty());
 
-  // Check that all 8 providers (including LTS variants) are registered in the registry
   bool hasNodeJs = false;
   bool hasNodeJsLts = false;
   bool hasVscodium = false;
+  bool hasVsCode = false;
   bool hasPython = false;
   bool hasOpenJdk = false;
   bool hasOpenJdkLts = false;
@@ -25,6 +25,8 @@ TEST(ProvidersTest, RegistryInitialization) {
       hasNodeJsLts = true;
     } else if (provider->GetIdentifier() == "vscodium") {
       hasVscodium = true;
+    } else if (provider->GetIdentifier() == "vscode") {
+      hasVsCode = true;
     } else if (provider->GetIdentifier() == "python") {
       hasPython = true;
     } else if (provider->GetIdentifier() == "jdk") {
@@ -41,6 +43,7 @@ TEST(ProvidersTest, RegistryInitialization) {
   ASSERT_TRUE(hasNodeJs);
   ASSERT_TRUE(hasNodeJsLts);
   ASSERT_TRUE(hasVscodium);
+  ASSERT_TRUE(hasVsCode);
   ASSERT_TRUE(hasPython);
   ASSERT_TRUE(hasOpenJdk);
   ASSERT_TRUE(hasOpenJdkLts);
@@ -143,6 +146,22 @@ TEST(ProvidersTest, OpenJdkMultiPlatform) {
               "normal/eclipse");
   ASSERT_TRUE(jdk.GetArchiveFilename("jdk-17.0.1+12", PlatformType::Linux, ArchitectureType::Arm64) ==
               "openjdk-jdk-17.0.1+12-aarch64.tar.gz");
+}
+
+TEST(ProvidersTest, VSCodeMultiPlatform) {
+  const VSCodePackageProvider vscode;
+
+  // Windows x64
+  ASSERT_TRUE(vscode.GetDownloadUrl("1.85.0", PlatformType::Windows, ArchitectureType::X64) ==
+              "https://update.code.visualstudio.com/1.85.0/win32-x64-archive/stable");
+  ASSERT_TRUE(vscode.GetArchiveFilename("1.85.0", PlatformType::Windows, ArchitectureType::X64) ==
+              "vscode-win32-x64-archive-1.85.0.zip");
+
+  // macOS ARM64
+  ASSERT_TRUE(vscode.GetDownloadUrl("1.85.0", PlatformType::macOS, ArchitectureType::Arm64) ==
+              "https://update.code.visualstudio.com/1.85.0/darwin-arm64/stable");
+  ASSERT_TRUE(vscode.GetArchiveFilename("1.85.0", PlatformType::macOS, ArchitectureType::Arm64) ==
+              "vscode-darwin-arm64-1.85.0.zip");
 }
 
 } // namespace CatUpdate

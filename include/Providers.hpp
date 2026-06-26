@@ -113,6 +113,22 @@ public:
 };
 
 /**
+ * Package provider for Visual Studio Code (VSCode).
+ */
+class VSCodePackageProvider : public BasePackageProvider {
+public:
+  PackageIdentifier GetIdentifier() const override;
+  PackageName GetDisplayName() const override;
+  bool IsPlatformSupported(PlatformType platform, ArchitectureType arch) const override;
+  std::vector<PackageVersion>
+  FetchAvailableVersions(HttpClient& httpClient, PlatformType targetPlatform = PlatformTraits::GetPlatformType(),
+                         ArchitectureType targetArch = PlatformTraits::GetHostArchitecture()) override;
+  UrlString GetDownloadUrl(const PackageVersion& version, PlatformType platform, ArchitectureType arch) const override;
+  std::string GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                 ArchitectureType arch) const override;
+};
+
+/**
  * Package provider for Python (Windows-only via NuGet full binaries).
  */
 class PythonPackageProvider : public BasePackageProvider {

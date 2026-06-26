@@ -200,6 +200,85 @@ std::string VSCodiumPackageProvider::GetArchiveFilename(const PackageVersion& ve
 }
 
 // -----------------------------------------------------------------------------
+// VSCode Provider Implementation
+// -----------------------------------------------------------------------------
+
+PackageIdentifier VSCodePackageProvider::GetIdentifier() const {
+  return "vscode";
+}
+
+PackageName VSCodePackageProvider::GetDisplayName() const {
+  return "Visual Studio Code";
+}
+
+bool VSCodePackageProvider::IsPlatformSupported(PlatformType /*platform*/, ArchitectureType /*arch*/) const {
+  return true;
+}
+
+std::vector<PackageVersion> VSCodePackageProvider::FetchAvailableVersions(HttpClient& httpClient,
+                                                                          PlatformType /*targetPlatform*/,
+                                                                          ArchitectureType /*targetArch*/) {
+  std::vector<PackageVersion> versions;
+  const std::string rawJson = FetchRemoteJson(httpClient, "https://update.code.visualstudio.com/api/releases/stable");
+  if (rawJson.empty()) {
+    return versions;
+  }
+
+  try {
+    auto parsedData = nlohmann::json::parse(rawJson);
+    if (parsedData.is_array()) {
+      for (const auto& item : parsedData) {
+        if (item.is_string()) {
+          versions.push_back(item.get<std::string>());
+        }
+      }
+    }
+  } catch (const std::exception& ex) {
+    SystemLogger::LogError("Exception parsing VSCode releases JSON", ex.what());
+  }
+  return versions;
+}
+
+namespace {
+std::string GetVsCodePlatformString(PlatformType platform, ArchitectureType arch) {
+  if (platform == PlatformType::Windows) {
+    if (arch == ArchitectureType::Arm64) {
+      return "win32-arm64-archive";
+    }
+    return "win32-x64-archive";
+  }
+  if (platform == PlatformType::macOS) {
+    if (arch == ArchitectureType::Arm64) {
+      return "darwin-arm64";
+    }
+    return "darwin";
+  }
+  if (arch == ArchitectureType::Arm64) {
+    return "linux-arm64";
+  }
+  return "linux-x64";
+}
+std::string GetVsCodeArchiveExtension(PlatformType platform) {
+  if (platform == PlatformType::Linux) {
+    return ".tar.gz";
+  }
+  return ".zip";
+}
+} // namespace
+
+UrlString VSCodePackageProvider::GetDownloadUrl(const PackageVersion& version, PlatformType platform,
+                                                ArchitectureType arch) const {
+  std::string const platformStr = GetVsCodePlatformString(platform, arch);
+  return std::format("https://update.code.visualstudio.com/{0}/{1}/stable", version, platformStr);
+}
+
+std::string VSCodePackageProvider::GetArchiveFilename(const PackageVersion& version, PlatformType platform,
+                                                      ArchitectureType arch) const {
+  std::string const platformStr = GetVsCodePlatformString(platform, arch);
+  return std::format("vscode-{}-{}{}", platformStr, version, GetVsCodeArchiveExtension(platform));
+}
+
+// -----------------------------------------------------------------------------
 // Python Provider Implementation (Windows-only via NuGet)
 // -----------------------------------------------------------------------------
 
@@ -479,6 +558,7 @@ std::vector<std::unique_ptr<PackageProvider>> PackageProviderRegistry::GetRegist
   providers.push_back(std::make_unique<NodeJsPackageProvider>());
   providers.push_back(std::make_unique<NodeJsLtsPackageProvider>());
   providers.push_back(std::make_unique<VSCodiumPackageProvider>());
+  providers.push_back(std::make_unique<VSCodePackageProvider>());
   providers.push_back(std::make_unique<PythonPackageProvider>());
   providers.push_back(std::make_unique<OpenJdkPackageProvider>());
   providers.push_back(std::make_unique<OpenJdkLtsPackageProvider>());
