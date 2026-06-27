@@ -50,6 +50,9 @@ void FlattenInstallationDirectory(const std::filesystem::path& directory) {
 
   // If there is exactly one child and it is a directory, promote its contents
   if (childCount == 1 && !singleSubdir.empty()) {
+    if (singleSubdir.extension() == ".app") {
+      return;
+    }
     std::vector<std::filesystem::path> pathsToMove;
     for (const auto& entry : std::filesystem::directory_iterator(singleSubdir)) {
       pathsToMove.push_back(entry.path());
@@ -163,7 +166,8 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
   auto const archiveName = provider.GetArchiveFilename(version, targetPlatform, targetArch);
   auto const tempArchiveFile = m_manifest.GetInstallationRootDirectory() / ("temp_" + archiveName);
   auto const tempExtractDir = m_manifest.GetInstallationRootDirectory() / ("temp_extract_" + provider.GetIdentifier());
-  auto const targetInstallationDir = m_manifest.GetInstallationRootDirectory() / provider.GetIdentifier();
+  auto const targetInstallationDir =
+      m_manifest.GetInstallationRootDirectory() / provider.GetInstallationSubdirectoryName();
 
   // 1. Clean up any leftover temporary files/folders from previous crashed runs
   std::filesystem::remove(tempArchiveFile);
@@ -242,7 +246,8 @@ bool PackageManager::InstallPackage(PackageProvider& provider, const PackageVers
   FlattenInstallationDirectory(tempExtractDir);
 
   // 5. Atomic swap with rollback protection
-  auto const oldBackupDir = m_manifest.GetInstallationRootDirectory() / ("old_" + provider.GetIdentifier());
+  auto const oldBackupDir =
+      m_manifest.GetInstallationRootDirectory() / ("old_" + provider.GetInstallationSubdirectoryName());
   if (!SwapDirectoriesWithRollback(tempExtractDir, targetInstallationDir, oldBackupDir, logCallback)) {
     return false;
   }

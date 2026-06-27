@@ -199,6 +199,10 @@ std::string VSCodiumPackageProvider::GetArchiveFilename(const PackageVersion& ve
   return std::format("VSCodium-{}-{}{}", platformName, version, PlatformTraits::GetArchiveExtension(platform, arch));
 }
 
+std::string VSCodiumPackageProvider::GetInstallationSubdirectoryName() const {
+  return "VSCodium";
+}
+
 // -----------------------------------------------------------------------------
 // VSCode Provider Implementation
 // -----------------------------------------------------------------------------
@@ -276,6 +280,10 @@ std::string VSCodePackageProvider::GetArchiveFilename(const PackageVersion& vers
                                                       ArchitectureType arch) const {
   std::string const platformStr = GetVsCodePlatformString(platform, arch);
   return std::format("vscode-{}-{}{}", platformStr, version, GetVsCodeArchiveExtension(platform));
+}
+
+std::string VSCodePackageProvider::GetInstallationSubdirectoryName() const {
+  return "VSCode";
 }
 
 // -----------------------------------------------------------------------------

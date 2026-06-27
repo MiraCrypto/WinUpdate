@@ -162,6 +162,13 @@ TEST(ProvidersTest, VSCodeMultiPlatform) {
               "https://update.code.visualstudio.com/1.85.0/darwin-arm64/stable");
   ASSERT_TRUE(vscode.GetArchiveFilename("1.85.0", PlatformType::macOS, ArchitectureType::Arm64) ==
               "vscode-darwin-arm64-1.85.0.zip");
+
+  ASSERT_TRUE(vscode.GetInstallationSubdirectoryName() == "VSCode");
+}
+
+TEST(ProvidersTest, VSCodiumMultiPlatform) {
+  const VSCodiumPackageProvider vscodium;
+  ASSERT_TRUE(vscodium.GetInstallationSubdirectoryName() == "VSCodium");
 }
 
 } // namespace CatUpdate
