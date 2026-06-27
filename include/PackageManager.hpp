@@ -6,6 +6,10 @@
 #include <string>
 #include <vector>
 
+#include <map>
+#include <mutex>
+#include <set>
+
 namespace CatUpdate {
 
 using ProgressCallback = std::function<void(float progress)>;
@@ -26,8 +30,20 @@ public:
 
   bool UninstallPackage(const PackageIdentifier& packageId, const LogCallback& logCallback = nullptr);
 
+  enum class UpdateStatus { NotInstalled, Checking, UpToDate, UpdateAvailable, CheckFailed };
+
+  UpdateStatus GetUpdateStatus(PackageProvider& provider, std::string& outLatestVersion,
+                               const std::function<void(const std::vector<PackageVersion>&)>& onComplete = nullptr);
+
+  std::vector<PackageVersion> GetCachedVersions(const PackageIdentifier& packageId);
+
+  void ClearVersionsCache();
+
 private:
   ManifestManager& m_manifest;
+  std::map<PackageIdentifier, std::vector<PackageVersion>> m_versionsCache;
+  std::set<PackageIdentifier> m_pendingVersionQueries;
+  std::mutex m_cacheMutex;
 };
 
 } // namespace CatUpdate

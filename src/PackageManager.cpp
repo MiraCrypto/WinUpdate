@@ -9,6 +9,7 @@
 #include <exception>
 #include <filesystem>
 #include <format>
+#include <thread>
 #include <utility>
 
 namespace CatUpdate {
@@ -311,6 +312,68 @@ bool PackageManager::UninstallPackage(const PackageIdentifier& packageId, const 
     }
     return false;
   }
+}
+
+PackageManager::UpdateStatus
+PackageManager::GetUpdateStatus(PackageProvider& provider, std::string& outLatestVersion,
+                                const std::function<void(const std::vector<PackageVersion>&)>& onComplete) {
+  std::scoped_lock const lock(m_cacheMutex);
+
+  auto const packageId = provider.GetIdentifier();
+  auto const cacheIterator = m_versionsCache.find(packageId);
+  if (cacheIterator != m_versionsCache.end()) {
+    if (!cacheIterator->second.empty()) {
+      outLatestVersion = cacheIterator->second.front();
+      auto const installedState = m_manifest.GetInstalledPackageByIdentifier(packageId);
+      if (installedState.has_value()) {
+        if (Utils::CompareVersions(installedState->installedVersion, outLatestVersion) < 0) {
+          return UpdateStatus::UpdateAvailable;
+        }
+        return UpdateStatus::UpToDate;
+      }
+      return UpdateStatus::NotInstalled;
+    }
+    return UpdateStatus::CheckFailed;
+  }
+
+  if (m_pendingVersionQueries.contains(packageId)) {
+    return UpdateStatus::Checking;
+  }
+
+  m_pendingVersionQueries.insert(packageId);
+
+  // Spawn background thread to query the provider asynchronously
+  std::thread([this, &provider, onComplete]() {
+    auto httpClient = HttpClientFactory::CreateDefaultClient();
+    auto versionsList = provider.FetchAvailableVersions(*httpClient);
+
+    {
+      std::scoped_lock const callbackLock(m_cacheMutex);
+      m_versionsCache[provider.GetIdentifier()] = versionsList;
+      m_pendingVersionQueries.erase(provider.GetIdentifier());
+    }
+
+    if (onComplete != nullptr) {
+      onComplete(versionsList);
+    }
+  }).detach();
+
+  return UpdateStatus::Checking;
+}
+
+std::vector<PackageVersion> PackageManager::GetCachedVersions(const PackageIdentifier& packageId) {
+  std::scoped_lock const lock(m_cacheMutex);
+  auto const cacheIterator = m_versionsCache.find(packageId);
+  if (cacheIterator != m_versionsCache.end()) {
+    return cacheIterator->second;
+  }
+  return {};
+}
+
+void PackageManager::ClearVersionsCache() {
+  std::scoped_lock const lock(m_cacheMutex);
+  m_versionsCache.clear();
+  m_pendingVersionQueries.clear();
 }
 
 } // namespace CatUpdate

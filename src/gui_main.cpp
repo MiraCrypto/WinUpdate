@@ -95,6 +95,7 @@ int DesktopUserInterface::Run(HINSTANCE hinstance, int cmdShow) {
   // Set default manifest directory
   auto defaultRootDirectory = PathResolver::GetDefaultInstallationRootPath();
   m_manifest = std::make_unique<ManifestManager>(defaultRootDirectory);
+  m_packageManager = std::make_unique<PackageManager>(*m_manifest);
 
   // Setup controls and DPI scaling
   CreateControls(m_mainWindow);
@@ -519,28 +520,21 @@ void DesktopUserInterface::RefreshInstalledList() {
     // Status
     std::wstring statusText = L"Available";
     if (installedVersionStr != L"Not Installed") {
-      auto const packageId = m_providers[i]->GetIdentifier();
-      if (m_versionsCache.contains(packageId) && !m_versionsCache[packageId].empty()) {
-        std::string const latestVersion = m_versionsCache[packageId].front();
-        std::string const installedVersion = Utils::ToString(installedVersionStr);
-        if (Utils::CompareVersions(installedVersion, latestVersion) < 0) {
-          statusText = L"Update Available (v" + Utils::ToWString(latestVersion) + L")";
-        } else {
-          statusText = L"Up to date";
-        }
-      } else {
-        if (!m_pendingVersionQueries.contains(packageId)) {
-          m_pendingVersionQueries.insert(packageId);
-          size_t const indexCopy = i;
-          std::thread([indexCopy, packageId]() {
-            auto httpClient = HttpClientFactory::CreateDefaultClient();
-            auto versionsList = m_providers[indexCopy]->FetchAvailableVersions(*httpClient);
-            auto* heapVersionsList = new std::vector<PackageVersion>(std::move(versionsList));
-            SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, indexCopy),
-                        reinterpret_cast<LPARAM>(heapVersionsList));
-          }).detach();
-        }
+      std::string latestVersion;
+      auto const status = m_packageManager->GetUpdateStatus(*m_providers[i], latestVersion, [i](const auto&) {
+        PostMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, i), 0);
+      });
+
+      if (status == PackageManager::UpdateStatus::Checking) {
         statusText = L"Checking for updates...";
+      } else if (status == PackageManager::UpdateStatus::UpdateAvailable) {
+        statusText = L"Update Available (v" + Utils::ToWString(latestVersion) + L")";
+      } else if (status == PackageManager::UpdateStatus::UpToDate) {
+        statusText = L"Up to date";
+      } else if (status == PackageManager::UpdateStatus::CheckFailed) {
+        statusText = L"Installed (Update check failed)";
+      } else {
+        statusText = L"Installed & Registered";
       }
     }
     ListView_SetItemText(m_packageListView, static_cast<int>(i), 2, const_cast<LPWSTR>(statusText.c_str()));
@@ -569,50 +563,36 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
 
   SendMessage(m_versionComboBox, CB_RESETCONTENT, 0, 0);
 
-  // 1. Check Cache
-  auto const cacheIterator = m_versionsCache.find(packageId);
-  if (cacheIterator != m_versionsCache.end() && !cacheIterator->second.empty()) {
-    AppendLog(L"Loaded available versions list from memory cache.");
-    for (const auto& version : cacheIterator->second) {
-      std::wstring const wVersion = Utils::ToWString(version);
-      SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
-    }
-    SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
+  std::string latestVersion;
+  auto const status = m_packageManager->GetUpdateStatus(*provider, latestVersion, [selectedIndex](const auto&) {
+    PostMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, selectedIndex), 0);
+  });
 
-    if (!m_isExecutingBackgroundAction) {
-      EnableWindow(m_installButton, TRUE);
-      SetWindowTextW(m_statusStatusBar, L"Status: Versions registry loaded from cache.");
-    } else {
-      SetWindowTextW(m_statusStatusBar, L"Status: Busy... Background action in progress.");
-    }
-    return;
-  }
-
-  // 2. Check In-Progress Queries
-  if (m_pendingVersionQueries.contains(packageId)) {
-    AppendLog(L"Version query is already in progress for this package.");
+  if (status == PackageManager::UpdateStatus::Checking) {
+    AppendLog(L"Version query is in progress for this package.");
     SetWindowTextW(m_statusStatusBar, L"Status: Querying remote versions registry (in progress)...");
     EnableWindow(m_installButton, FALSE);
-    return;
+  } else if (status == PackageManager::UpdateStatus::CheckFailed) {
+    SetWindowTextW(m_statusStatusBar, L"Status: Failed to retrieve versions from remote registry.");
+    EnableWindow(m_installButton, FALSE);
+  } else {
+    auto const versions = m_packageManager->GetCachedVersions(packageId);
+    if (!versions.empty()) {
+      AppendLog(L"Loaded available versions list from memory cache.");
+      for (const auto& version : versions) {
+        std::wstring const wVersion = Utils::ToWString(version);
+        SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
+      }
+      SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
+
+      if (!m_isExecutingBackgroundAction) {
+        EnableWindow(m_installButton, TRUE);
+        SetWindowTextW(m_statusStatusBar, L"Status: Versions registry loaded from cache.");
+      } else {
+        SetWindowTextW(m_statusStatusBar, L"Status: Busy... Background action in progress.");
+      }
+    }
   }
-
-  // 3. Start New Query
-  m_pendingVersionQueries.insert(packageId);
-  AppendLog(L"Querying remote versions registry...");
-  SetWindowTextW(m_statusStatusBar, L"Status: Querying remote versions registry...");
-  EnableWindow(m_installButton, FALSE);
-
-  // Fetch versions asynchronously to prevent GUI freezing
-  std::thread([selectedIndex, packageId]() {
-    auto httpClient = HttpClientFactory::CreateDefaultClient();
-    auto versionsList = m_providers[selectedIndex]->FetchAvailableVersions(*httpClient);
-
-    // Safely allocate version list on the heap to pass across threads
-    auto* heapVersionsList = new std::vector<PackageVersion>(std::move(versionsList));
-
-    // Populate UI in main thread context
-    SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, selectedIndex), reinterpret_cast<LPARAM>(heapVersionsList));
-  }).detach();
 }
 
 void DesktopUserInterface::TriggerInstallation() {
@@ -888,41 +868,49 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
       auto* provider = m_providers[responsePackageIndex].get();
       auto const packageId = provider->GetIdentifier();
 
-      // Wrap in std::unique_ptr to ensure the heap-allocated vector is cleaned up automatically
-      std::unique_ptr<std::vector<PackageVersion>> const versions(
-          reinterpret_cast<std::vector<PackageVersion>*>(lparam));
+      // Get the updated status and latest version from the package manager
+      std::string latestVersion;
+      auto const status = m_packageManager->GetUpdateStatus(*provider, latestVersion);
 
-      // 1. Remove from pending and cache the versions (so the background refresh is saved!)
-      m_pendingVersionQueries.erase(packageId);
-      m_versionsCache[packageId] = *versions;
-
-      // Update status column in ListView if package is installed
-      auto const installedState = m_manifest->GetInstalledPackageByIdentifier(packageId);
-      if (installedState.has_value() && !versions->empty()) {
-        std::string const latestVersion = versions->front();
-        std::string const installedVersion = installedState->installedVersion;
-
-        std::wstring statusText = L"Up to date";
-        if (Utils::CompareVersions(installedVersion, latestVersion) < 0) {
-          statusText = L"Update Available (v" + Utils::ToWString(latestVersion) + L")";
-        }
-        ListView_SetItemText(m_packageListView, responsePackageIndex, 2, const_cast<LPWSTR>(statusText.c_str()));
+      // 1. Update status column in ListView
+      std::wstring statusText = L"Available";
+      if (status == PackageManager::UpdateStatus::Checking) {
+        statusText = L"Checking for updates...";
+      } else if (status == PackageManager::UpdateStatus::UpdateAvailable) {
+        statusText = L"Update Available (v" + Utils::ToWString(latestVersion) + L")";
+      } else if (status == PackageManager::UpdateStatus::UpToDate) {
+        statusText = L"Up to date";
+      } else if (status == PackageManager::UpdateStatus::CheckFailed) {
+        statusText = L"Installed (Update check failed)";
+      } else if (status == PackageManager::UpdateStatus::NotInstalled) {
+        statusText = L"Available";
       }
+      ListView_SetItemText(m_packageListView, responsePackageIndex, 2, const_cast<LPWSTR>(statusText.c_str()));
 
       // 2. If it is still the currently selected package, update the UI
       if (responsePackageIndex == m_selectedPackageIndex) {
         SendMessage(m_versionComboBox, CB_RESETCONTENT, 0, 0);
-        for (const auto& v : *versions) {
-          std::wstring const wVersion = Utils::ToWString(v);
-          SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
-        }
-        SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
 
-        if (!m_isExecutingBackgroundAction) {
-          EnableWindow(m_installButton, TRUE);
-          SetWindowTextW(m_statusStatusBar, L"Status: Versions registry updated.");
+        auto const versions = m_packageManager->GetCachedVersions(packageId);
+        if (!versions.empty()) {
+          for (const auto& v : versions) {
+            std::wstring const wVersion = Utils::ToWString(v);
+            SendMessage(m_versionComboBox, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wVersion.c_str()));
+          }
+          SendMessage(m_versionComboBox, CB_SETCURSEL, 0, 0);
+
+          if (!m_isExecutingBackgroundAction) {
+            EnableWindow(m_installButton, TRUE);
+            SetWindowTextW(m_statusStatusBar, L"Status: Versions registry updated.");
+          }
+          AppendLog(L"Loaded available versions list successfully.");
+        } else {
+          if (!m_isExecutingBackgroundAction) {
+            EnableWindow(m_installButton, FALSE);
+            SetWindowTextW(m_statusStatusBar, L"Status: Failed to retrieve versions from remote registry.");
+          }
+          AppendLog(L"Failed to retrieve available versions list.");
         }
-        AppendLog(L"Loaded available versions list successfully.");
       } else {
         AppendLog(L"Cached background versions list for " + Utils::ToWString(provider->GetDisplayName()) + L".");
       }
@@ -1020,10 +1008,10 @@ void DesktopUserInterface::PopulatePathComboBox() {
 void DesktopUserInterface::UpdateInstallationPath(const std::filesystem::path& newPath) {
   m_manifest = std::make_unique<ManifestManager>(newPath);
   m_manifest->SaveManifestToFile();
+  m_packageManager = std::make_unique<PackageManager>(*m_manifest);
 
   AppendLog(L"Installation root path changed to: " + newPath.wstring());
 
-  m_versionsCache.clear();
   RefreshInstalledList();
 
   m_selectedPackageIndex = -1;
