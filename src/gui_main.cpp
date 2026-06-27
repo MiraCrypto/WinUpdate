@@ -517,8 +517,32 @@ void DesktopUserInterface::RefreshInstalledList() {
     ListView_SetItemText(m_packageListView, static_cast<int>(i), 1, const_cast<LPWSTR>(installedVersionStr.c_str()));
 
     // Status
-    std::wstring const statusText =
-        (installedVersionStr == L"Not Installed") ? L"Available" : L"Installed & Registered";
+    std::wstring statusText = L"Available";
+    if (installedVersionStr != L"Not Installed") {
+      auto const packageId = m_providers[i]->GetIdentifier();
+      if (m_versionsCache.contains(packageId) && !m_versionsCache[packageId].empty()) {
+        std::string const latestVersion = m_versionsCache[packageId].front();
+        std::string const installedVersion = Utils::ToString(installedVersionStr);
+        if (Utils::CompareVersions(installedVersion, latestVersion) < 0) {
+          statusText = L"Update Available (v" + Utils::ToWString(latestVersion) + L")";
+        } else {
+          statusText = L"Up to date";
+        }
+      } else {
+        if (!m_pendingVersionQueries.contains(packageId)) {
+          m_pendingVersionQueries.insert(packageId);
+          size_t const indexCopy = i;
+          std::thread([indexCopy, packageId]() {
+            auto httpClient = HttpClientFactory::CreateDefaultClient();
+            auto versionsList = m_providers[indexCopy]->FetchAvailableVersions(*httpClient);
+            auto* heapVersionsList = new std::vector<PackageVersion>(std::move(versionsList));
+            SendMessage(m_mainWindow, WM_COMMAND, MAKEWPARAM(3001, indexCopy),
+                        reinterpret_cast<LPARAM>(heapVersionsList));
+          }).detach();
+        }
+        statusText = L"Checking for updates...";
+      }
+    }
     ListView_SetItemText(m_packageListView, static_cast<int>(i), 2, const_cast<LPWSTR>(statusText.c_str()));
   }
 }
@@ -547,7 +571,7 @@ void DesktopUserInterface::OnPackageSelectionChanged() {
 
   // 1. Check Cache
   auto const cacheIterator = m_versionsCache.find(packageId);
-  if (cacheIterator != m_versionsCache.end()) {
+  if (cacheIterator != m_versionsCache.end() && !cacheIterator->second.empty()) {
     AppendLog(L"Loaded available versions list from memory cache.");
     for (const auto& version : cacheIterator->second) {
       std::wstring const wVersion = Utils::ToWString(version);
@@ -871,6 +895,19 @@ LRESULT CALLBACK DesktopUserInterface::MainWndProc(HWND hwnd, UINT message, WPAR
       // 1. Remove from pending and cache the versions (so the background refresh is saved!)
       m_pendingVersionQueries.erase(packageId);
       m_versionsCache[packageId] = *versions;
+
+      // Update status column in ListView if package is installed
+      auto const installedState = m_manifest->GetInstalledPackageByIdentifier(packageId);
+      if (installedState.has_value() && !versions->empty()) {
+        std::string const latestVersion = versions->front();
+        std::string const installedVersion = installedState->installedVersion;
+
+        std::wstring statusText = L"Up to date";
+        if (Utils::CompareVersions(installedVersion, latestVersion) < 0) {
+          statusText = L"Update Available (v" + Utils::ToWString(latestVersion) + L")";
+        }
+        ListView_SetItemText(m_packageListView, responsePackageIndex, 2, const_cast<LPWSTR>(statusText.c_str()));
+      }
 
       // 2. If it is still the currently selected package, update the UI
       if (responsePackageIndex == m_selectedPackageIndex) {

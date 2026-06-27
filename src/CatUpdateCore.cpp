@@ -32,7 +32,99 @@ InstalledPackageState ParsePackageState(const nlohmann::json& item) {
 
   return state;
 }
+std::string CleanVersion(const std::string& versionString) {
+  size_t const firstDigit = versionString.find_first_of("0123456789");
+  if (firstDigit == std::string::npos) {
+    return "";
+  }
+  std::string result;
+  for (size_t i = firstDigit; i < versionString.size(); ++i) {
+    char const character = versionString[i];
+    if (character == '+') {
+      break;
+    }
+    if ((std::isdigit(character) != 0) || character == '.' || character == '-' || character == '_') {
+      result += character;
+    } else {
+      break;
+    }
+  }
+  return result;
+}
+
+std::vector<std::string> SplitVersion(const std::string& sourceString) {
+  std::vector<std::string> parts;
+  std::string part;
+  for (char const character : sourceString) {
+    if (character == '.' || character == '-' || character == '+') {
+      if (!part.empty()) {
+        parts.push_back(part);
+        part.clear();
+      }
+    } else {
+      part += character;
+    }
+  }
+  if (!part.empty()) {
+    parts.push_back(part);
+  }
+  return parts;
+}
+
+bool IsAllDigits(const std::string& str) {
+  if (str.empty()) {
+    return false;
+  }
+  return std::ranges::all_of(str, [](char const character) { return std::isdigit(character) != 0; });
+}
+
+int CompareComponents(const std::string& component1, const std::string& component2) {
+  bool const isNum1 = IsAllDigits(component1);
+  bool const isNum2 = IsAllDigits(component2);
+
+  if (isNum1 && isNum2) {
+    try {
+      int const val1 = std::stoi(component1);
+      int const val2 = std::stoi(component2);
+      if (val1 < val2) {
+        return -1;
+      }
+      if (val1 > val2) {
+        return 1;
+      }
+      return 0;
+    } catch (const std::exception& ex) {
+      SystemLogger::LogError("CompareComponents parsing error", ex.what());
+    }
+  }
+
+  int const comp = component1.compare(component2);
+  if (comp < 0) {
+    return -1;
+  }
+  if (comp > 0) {
+    return 1;
+  }
+  return 0;
+}
 } // namespace
+
+int Utils::CompareVersions(const std::string& versionString1, const std::string& versionString2) {
+  auto const parts1 = SplitVersion(CleanVersion(versionString1));
+  auto const parts2 = SplitVersion(CleanVersion(versionString2));
+
+  size_t const maxLen = std::max(parts1.size(), parts2.size());
+  for (size_t i = 0; i < maxLen; ++i) {
+    std::string const component1 = (i < parts1.size()) ? parts1[i] : "0";
+    std::string const component2 = (i < parts2.size()) ? parts2[i] : "0";
+
+    int const comp = CompareComponents(component1, component2);
+    if (comp != 0) {
+      return comp;
+    }
+  }
+  return 0;
+}
 
 // -----------------------------------------------------------------------------
 // SystemLogger Common Interface (Delegates debug outputs to platform files)

@@ -116,6 +116,25 @@ TEST(UtilsTest, WideStringConversions) {
   ASSERT_TRUE(originalUtf8 == roundTripUtf8);
 }
 
+TEST(UtilsTest, VersionComparison) {
+  // Test basic numeric comparisons
+  ASSERT_TRUE(Utils::CompareVersions("1.85.0", "1.84.2") > 0);
+  ASSERT_TRUE(Utils::CompareVersions("1.84.2", "1.85.0") < 0);
+  ASSERT_TRUE(Utils::CompareVersions("1.85.0", "1.85.0") == 0);
+
+  // Test leading 'v' stripping
+  ASSERT_TRUE(Utils::CompareVersions("v26.3.1", "26.3.1") == 0);
+  ASSERT_TRUE(Utils::CompareVersions("v26.3.2", "v26.3.1") > 0);
+
+  // Test non-standard prefix stripping (e.g., Adoptium JDK)
+  ASSERT_TRUE(Utils::CompareVersions("jdk-17.0.1+12", "jdk-17.0.2+1") < 0);
+  ASSERT_TRUE(Utils::CompareVersions("jdk-17.0.2+1", "17.0.2") == 0);
+
+  // Test varying length components
+  ASSERT_TRUE(Utils::CompareVersions("1.2", "1.2.0") == 0);
+  ASSERT_TRUE(Utils::CompareVersions("1.2.3", "1.2") > 0);
+}
+
 TEST(PlatformTraitsTest, GetHostArchitecture) {
   auto const arch = PlatformTraits::GetHostArchitecture();
   ASSERT_TRUE(arch == PlatformTraits::GetHostArchitecture());

@@ -62,6 +62,15 @@ public:
    * Converts a UTF-16 wstring to a UTF-8 string.
    */
   static std::string ToString(const std::wstring& utf16Str);
+
+  /**
+   * Compares two version strings.
+   * Returns:
+   *   -1 if versionString1 < versionString2
+   *    0 if versionString1 == versionString2
+   *    1 if versionString1 > versionString2
+   */
+  static int CompareVersions(const std::string& versionString1, const std::string& versionString2);
 };
 
 /**
