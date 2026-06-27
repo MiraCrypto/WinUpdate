@@ -613,10 +613,8 @@ void DesktopUserInterface::TriggerInstallation() {
   EnableWindow(m_uninstallButton, FALSE);
   EnableWindow(m_changePathButton, FALSE);
 
-  // Execute installation workflow in background thread using core PackageManager
   std::thread([packageIndex, version]() {
     auto* provider = m_providers[packageIndex].get();
-    PackageManager packageManager(*m_manifest);
 
     // Safe progress throttle tracker to avoid log buffer overflow
     struct DownloadProgressTracker {
@@ -624,7 +622,7 @@ void DesktopUserInterface::TriggerInstallation() {
     };
     auto tracker = std::make_shared<DownloadProgressTracker>();
 
-    bool const installSuccess = packageManager.InstallPackage(
+    bool const installSuccess = m_packageManager->InstallPackage(
         *provider, version, PlatformType::Windows, PlatformTraits::GetHostArchitecture(),
         // Progress Callback:
         [tracker](float progress) {
@@ -712,8 +710,7 @@ void DesktopUserInterface::TriggerUninstallation() {
 
   // Run uninstallation on background thread using core PackageManager
   std::thread([packageId]() {
-    PackageManager packageManager(*m_manifest);
-    bool const uninstallSuccess = packageManager.UninstallPackage(
+    bool const uninstallSuccess = m_packageManager->UninstallPackage(
         packageId,
         // Log Callback:
         [](const std::string& message) {
