@@ -83,7 +83,14 @@ endif()
 # =============================================================================
 # Compilation Target: Command-Line Interface (CLI)
 # =============================================================================
-add_executable(catupdate src/cli_main.cpp)
+if(WIN32)
+    add_executable(catupdate
+        src/cli_main.cpp
+        resources/resources.rc
+    )
+else()
+    add_executable(catupdate src/cli_main.cpp)
+endif()
 target_link_libraries(catupdate PRIVATE catupdate-core)
 
 # =============================================================================
