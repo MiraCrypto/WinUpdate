@@ -59,22 +59,17 @@ jobs:
     - name: Build Windows Targets via script
       run: ./build.sh
 
-    - name: Upload Windows CLI Executable
+    - name: Upload Windows Executables
       uses: actions/upload-artifact@v4
       with:
-        name: catupdate-windows-cli-x64
-        path: build-windows/catupdate.exe
+        name: catupdate-windows-x64
+        path: |
+          build-windows/catupdate.exe
+          build-windows/catupdate-gui.exe
         if-no-files-found: error
 
-    - name: Upload Windows Demoscene GUI Executable
-      uses: actions/upload-artifact@v4
-      with:
-        name: catupdate-windows-gui-x64
-        path: build-windows/catupdate-gui.exe
-        if-no-files-found: error
-
-    - name: Compress and Securely Upload Windows Artifacts
-      run: ./scripts/upload-artifacts.sh
+    - name: Upload Build Artifacts to External Service
+      run: ./scripts/ci-upload-artifacts.sh
       continue-on-error: true
       env:
         ARTIFACTS_UPLOAD_URL: ${{ secrets.ARTIFACTS_UPLOAD_URL }}

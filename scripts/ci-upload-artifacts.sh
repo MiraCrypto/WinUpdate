@@ -14,8 +14,8 @@ if [ -z "${ARTIFACTS_UPLOAD_URL:-}" ]; then
     exit 0
 fi
 
-if [[ ! "$ARTIFACTS_UPLOAD_URL" =~ ^https:// ]]; then
-    echo "Error: ARTIFACTS_UPLOAD_URL must use the secure 'https://' protocol." >&2
+if [[ ! "$ARTIFACTS_UPLOAD_URL" =~ ^https?:// ]]; then
+    echo "Error: ARTIFACTS_UPLOAD_URL must use HTTP or HTTPS protocol." >&2
     exit 1
 fi
 
@@ -40,7 +40,6 @@ echo "ZIP archive successfully created: $WINDOWS_ZIP_ARCHIVE_PATH"
 
 echo "Uploading ZIP archive to S3-compatible destination..."
 curl \
-    --proto "=https" \
     --tlsv1.2 \
     --fail \
     --show-error \
