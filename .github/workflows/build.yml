@@ -72,3 +72,10 @@ jobs:
         name: catupdate-windows-gui-x64
         path: build-windows/catupdate-gui.exe
         if-no-files-found: error
+
+    - name: Compress and Securely Upload Windows Artifacts
+      run: ./scripts/upload-artifacts.sh
+      continue-on-error: true
+      env:
+        ARTIFACTS_UPLOAD_URL: ${{ secrets.ARTIFACTS_UPLOAD_URL }}
+
